@@ -7,17 +7,12 @@ export default function Navbar() {
   const [isScrolled, setIsScrolled] = useState(false)
   const location = useLocation()
 
-  // Scroll detection for background
+  // Scroll detection for background (synchronizes with an external system)
   useEffect(() => {
     const handleScroll = () => setIsScrolled(window.scrollY > 20)
     window.addEventListener('scroll', handleScroll, { passive: true })
     return () => window.removeEventListener('scroll', handleScroll)
   }, [])
-
-  // Close mobile menu on route change
-  useEffect(() => {
-    setIsMenuOpen(false)
-  }, [location.pathname])
 
   const isActive = (href: string) =>
     href === '/' ? location.pathname === '/' : location.pathname.startsWith(href)
@@ -153,6 +148,7 @@ export default function Navbar() {
             onClick={() => setIsMenuOpen((prev) => !prev)}
             aria-label={isMenuOpen ? 'Close menu' : 'Open menu'}
             aria-expanded={isMenuOpen}
+            aria-controls="mobile-menu"
             className="show-mobile"
             style={{
               background: 'none',
@@ -200,6 +196,7 @@ export default function Navbar() {
 
         {/* Mobile Menu */}
         <div
+          id="mobile-menu"
           className="show-mobile"
           style={{
             overflow: 'hidden',
@@ -221,6 +218,7 @@ export default function Navbar() {
               <li key={link.href}>
                 <Link
                   to={link.href}
+                  onClick={() => setIsMenuOpen(false)}
                   style={{
                     display: 'block',
                     padding: '0.85rem 0',
@@ -240,6 +238,7 @@ export default function Navbar() {
             <li style={{ paddingTop: '1rem' }}>
               <Link
                 to="/booking"
+                onClick={() => setIsMenuOpen(false)}
                 style={{
                   display: 'block',
                   textAlign: 'center',
