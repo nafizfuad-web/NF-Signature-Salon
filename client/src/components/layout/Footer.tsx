@@ -1,9 +1,14 @@
 import { Link } from 'react-router-dom'
+import OpeningHours from '@/components/common/OpeningHours'
+import { SALON_LOCATION } from '@/services/salonConfig'
 import { NAV_LINKS } from '@/utils/constants'
 
-export default function Footer() {
-  const year = new Date().getFullYear()
+const CURRENT_YEAR = new Date().getFullYear()
+const directionsUrl = SALON_LOCATION.address
+? `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(SALON_LOCATION.displayAddress)}`
+  : undefined
 
+export default function Footer() {
   return (
     <footer
       style={{
@@ -109,26 +114,51 @@ export default function Footer() {
             </h4>
             <ul style={{ listStyle: 'none', display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
               {[
-                { label: 'Book an Appointment', href: '/booking' },
-                { label: 'Get Directions', href: '/contact' },
-                { label: 'Call Us', href: 'tel:+8801700000000' },
+                { label: 'Book an Appointment', href: '/booking', external: false },
+                ...(directionsUrl
+                  ? [{ label: 'Get Directions', href: directionsUrl, external: true }]
+                  : []),
+                ...(SALON_LOCATION.phone
+                  ? [{ label: 'Call the salon', href: `tel:${SALON_LOCATION.phone}`, external: true }]
+                  : []),
+                ...(SALON_LOCATION.email
+                  ? [{ label: 'Email the salon', href: `mailto:${SALON_LOCATION.email}`, external: true }]
+                  : []),
               ].map((item) => (
                 <li key={item.href}>
-                  <Link
-                    to={item.href}
-                    style={{
-                      fontSize: '0.875rem',
-                      color: 'var(--color-white-muted)',
-                      transition: 'color var(--transition-fast)',
-                    }}
-                    onMouseEnter={(e) => (e.currentTarget.style.color = 'var(--color-gold)')}
-                    onMouseLeave={(e) => (e.currentTarget.style.color = 'var(--color-white-muted)')}
-                  >
-                    {item.label}
-                  </Link>
+                  {item.external ? (
+                    <a
+                      href={item.href}
+                      target={item.href.startsWith('https:') ? '_blank' : undefined}
+                      rel={item.href.startsWith('https:') ? 'noreferrer' : undefined}
+                      style={{
+                        fontSize: '0.875rem',
+                        color: 'var(--color-white-muted)',
+                        transition: 'color var(--transition-fast)',
+                      }}
+                    >
+                      {item.label}
+                    </a>
+                  ) : (
+                    <Link
+                      to={item.href}
+                      style={{
+                        fontSize: '0.875rem',
+                        color: 'var(--color-white-muted)',
+                        transition: 'color var(--transition-fast)',
+                      }}
+                    >
+                      {item.label}
+                    </Link>
+                  )}
                 </li>
               ))}
             </ul>
+            <p style={{ fontSize: '0.8rem', color: 'var(--color-white-muted)', marginTop: '0.75rem' }}>
+              {SALON_LOCATION.address
+                ? SALON_LOCATION.displayAddress
+                : `${SALON_LOCATION.city} (development location)`}
+            </p>
           </div>
 
           {/* Hours */}
@@ -144,22 +174,29 @@ export default function Footer() {
             >
               Hours
             </h4>
-            <ul style={{ listStyle: 'none', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-              {[
-                { day: 'Mon – Fri', time: '9:00 AM – 8:00 PM' },
-                { day: 'Saturday', time: '9:00 AM – 6:00 PM' },
-                { day: 'Sunday', time: 'By Appointment' },
-              ].map((item) => (
-                <li
-                  key={item.day}
-                  style={{ display: 'flex', justifyContent: 'space-between', gap: '1rem', fontSize: '0.875rem' }}
-                >
-                  <span style={{ color: 'var(--color-white-muted)' }}>{item.day}</span>
-                  <span style={{ color: 'var(--color-gold-light)', fontWeight: 500 }}>{item.time}</span>
-                </li>
-              ))}
-            </ul>
+            <OpeningHours compact />
           </div>
+
+          {SALON_LOCATION.socialLinks.length > 0 && (
+            <div>
+              <h4 style={{
+                fontSize: '0.75rem',
+                letterSpacing: '0.2em',
+                textTransform: 'uppercase',
+                color: 'var(--color-gold)',
+                marginBottom: '1rem',
+              }}>
+                Follow
+              </h4>
+              <ul style={{ listStyle: 'none', display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
+                {SALON_LOCATION.socialLinks.map((social) => (
+                  <li key={social.label}>
+                    <a href={social.url} target="_blank" rel="noreferrer">{social.label}</a>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
         </div>
 
         {/* Bottom row */}
@@ -175,7 +212,7 @@ export default function Footer() {
           }}
         >
           <p style={{ fontSize: '0.8rem', color: 'var(--color-white-muted)', margin: 0 }}>
-            &copy; {year} NF Signature Salon. All rights reserved.
+            &copy; {CURRENT_YEAR} NF Signature Salon. All rights reserved.
           </p>
           <p style={{ fontSize: '0.8rem', color: 'var(--color-white-muted)', margin: 0 }}>
             Crafted with elegance
