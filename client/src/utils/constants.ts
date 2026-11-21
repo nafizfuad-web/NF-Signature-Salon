@@ -28,3 +28,30 @@ export const NAV_LINKS = [
   { label: 'About', href: '/about' },
   { label: 'Contact', href: '/contact' },
 ] as const
+
+export const SERVICE_CATEGORIES = [
+  {
+    id: 'hair',
+    name: 'Hair',
+    description: 'Precision cuts, color and styling',
+    category: 'hair' as const,
+  },
+  {
+    id: 'skin',
+    name: 'Skin',
+    description: 'Facials, peels and glow treatments',
+    category: 'skin' as const,
+  },
+  {
+    id: 'nails',
+    name: 'Nails',
+    description: 'Manicures, pedicures and nail art',
+    category: 'nails' as const,
+  },
+  {
+    id: 'wellness',
+    name: 'Wellness',
+    description: 'Massage, relaxation and therapy',
+    category: 'wellness' as const,
+  },
+] as const
