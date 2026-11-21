@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 450">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#17130d"/>
+      <stop offset="1" stop-color="#090909"/>
+    </linearGradient>
+    <radialGradient id="gold">
+      <stop offset="0" stop-color="#d3b65f" stop-opacity=".38"/>
+      <stop offset="1" stop-color="#d3b65f" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <rect width="900" height="450" fill="url(#bg)"/>
+  <circle cx="700" cy="120" r="260" fill="url(#gold)"/>
+  <circle cx="450" cy="225" r="88" fill="none" stroke="#c9a84c" stroke-width="3" opacity=".7"/>
+  <path d="M450 174c34 0 61 27 61 61s-27 61-61 61-61-27-61-61 27-61 61-61zm0 24c-20 0-37 17-37 37s17 37 37 37 37-17 37-37-17-37-37-37z" fill="#c9a84c" opacity=".9"/>
+  <text x="450" y="360" fill="#e1c777" text-anchor="middle" font-family="Georgia, serif" font-size="28" letter-spacing="8">NF SIGNATURE SALON</text>
+</svg>
