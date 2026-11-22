@@ -2,6 +2,7 @@ import type { ReactNode } from 'react'
 import { useLocation } from 'react-router-dom'
 import ButtonLink from '@/components/common/ButtonLink'
 import EmptyState from '@/components/common/EmptyState'
+import ErrorState from '@/components/common/ErrorState'
 import LoadingState from '@/components/common/LoadingState'
 import { useAuth } from '@/hooks/useAuth'
 import type { UserRole } from '@/types'
@@ -15,11 +16,22 @@ export default function DashboardAccessGate({
   children,
   role,
 }: DashboardAccessGateProps) {
-  const { user, isLoading } = useAuth()
+  const { user, token, isLoading, sessionError, restoreSession } = useAuth()
   const location = useLocation()
 
   if (isLoading) {
     return <LoadingState label="Checking your session…" />
+  }
+
+  if (token && sessionError && !user) {
+    return (
+      <ErrorState
+        title="Your session could not be verified"
+        message={sessionError}
+        onRetry={() => void restoreSession()}
+        retryLabel="Retry session check"
+      />
+    )
   }
 
   if (!user) {

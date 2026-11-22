@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { FormEvent } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import Button from '@/components/common/Button'
@@ -6,11 +6,24 @@ import FormField from '@/components/common/FormField'
 import Icon from '@/components/common/Icon'
 import { useAuth } from '@/hooks/useAuth'
 import { useToast } from '@/hooks/useToast'
+import { GOOGLE_CLIENT_ID } from '@/services/config'
 import type { AuthUser } from '@/types'
+import {
+  EMAIL_MAX_LENGTH,
+  EMAIL_PATTERN,
+  NAME_MAX_LENGTH,
+  PASSWORD_MAX_BYTES,
+  PASSWORD_MIN_LENGTH,
+  PHONE_MAX_DIGITS,
+  PHONE_MIN_DIGITS,
+  passwordByteLength,
+  phoneDigitCount,
+} from '@/utils/authValidation'
 import { getErrorMessage } from '@/utils/errors'
 
-const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
-const PASSWORD_PATTERN = /^(?=.*[A-Za-z])(?=.*\d).{8,}$/
+const PASSWORD_PATTERN = new RegExp(
+  `^(?=.*[A-Za-z])(?=.*\\d).{${PASSWORD_MIN_LENGTH},}$`
+)
 
 function safeRedirect(value: string | null): string | null {
   if (!value || !value.startsWith('/') || value.startsWith('//')) return null
@@ -32,7 +45,7 @@ interface FormErrors {
 }
 
 export default function SignUpPage() {
-  const { register, isAuthenticated, isLoading: authLoading, user } = useAuth()
+  const { register, loginWithGoogle, isAuthenticated, isLoading: authLoading, user } = useAuth()
   const { toast } = useToast()
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
@@ -47,6 +60,10 @@ export default function SignUpPage() {
   const [errors, setErrors] = useState<FormErrors>({})
   const [formError, setFormError] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
+  const [googleSubmitting, setGoogleSubmitting] = useState(false)
+  // Guards against a second submit before React can render the disabled button.
+  const submittingRef = useRef(false)
+  const googleSubmittingRef = useRef(false)
 
   useEffect(() => {
     if (!authLoading && isAuthenticated && user) {
@@ -56,16 +73,36 @@ export default function SignUpPage() {
 
   const validate = () => {
     const next: FormErrors = {}
-    if (name.trim().length < 2) next.name = 'Enter your full name.'
-    if (!email.trim()) next.email = 'Enter your email address.'
-    else if (!EMAIL_PATTERN.test(email.trim())) next.email = 'Enter a valid email address.'
-    if (phone.trim() && phone.replace(/[^\d]/g, '').length < 7) {
-      next.phone = 'Enter a valid phone number, or leave this blank.'
+    const cleanName = name.trim()
+    const cleanEmail = email.trim()
+    const phoneDigits = phoneDigitCount(phone)
+
+    if (cleanName.length < 2) next.name = 'Enter your full name.'
+    else if (cleanName.length > NAME_MAX_LENGTH) {
+      next.name = `Name must be ${NAME_MAX_LENGTH} characters or fewer.`
     }
+
+    if (!cleanEmail) next.email = 'Enter your email address.'
+    else if (cleanEmail.length > EMAIL_MAX_LENGTH) {
+      next.email = 'Email address is too long.'
+    } else if (!EMAIL_PATTERN.test(cleanEmail)) {
+      next.email = 'Enter a valid email address.'
+    }
+
+    if (
+      phone.trim() &&
+      (phoneDigits < PHONE_MIN_DIGITS || phoneDigits > PHONE_MAX_DIGITS)
+    ) {
+      next.phone = `Enter a valid phone number with ${PHONE_MIN_DIGITS}-${PHONE_MAX_DIGITS} digits, or leave this blank.`
+    }
+
     if (!password) next.password = 'Choose a password.'
     else if (!PASSWORD_PATTERN.test(password)) {
-      next.password = 'Use at least 8 characters, including a letter and a number.'
+      next.password = `Use at least ${PASSWORD_MIN_LENGTH} characters, including a letter and a number.`
+    } else if (passwordByteLength(password) > PASSWORD_MAX_BYTES) {
+      next.password = `Password must be ${PASSWORD_MAX_BYTES} bytes or fewer.`
     }
+
     if (password !== confirmPassword) next.confirmPassword = 'Passwords do not match.'
     if (!acceptedTerms) next.terms = 'Please accept the terms to create an account.'
     setErrors(next)
@@ -74,9 +111,12 @@ export default function SignUpPage() {
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
+    if (submittingRef.current || googleSubmittingRef.current) return
+
     setFormError(null)
     if (!validate()) return
 
+    submittingRef.current = true
     setSubmitting(true)
     try {
       const createdUser = await register({
@@ -92,7 +132,36 @@ export default function SignUpPage() {
       setFormError(message)
       toast.error('Could not create account', message)
     } finally {
+      submittingRef.current = false
       setSubmitting(false)
+    }
+  }
+
+  const handleGoogleSignIn = async () => {
+    if (googleSubmittingRef.current || submittingRef.current) return
+
+    if (!acceptedTerms) {
+      setErrors((current) => ({
+        ...current,
+        terms: 'Please accept the terms to create an account.',
+      }))
+      return
+    }
+
+    setFormError(null)
+    googleSubmittingRef.current = true
+    setGoogleSubmitting(true)
+    try {
+      const createdUser = await loginWithGoogle()
+      toast.success('Welcome to NF Signature', `Signed in as ${createdUser.name}.`)
+      navigate(destinationFor(createdUser, redirect), { replace: true })
+    } catch (caught) {
+      const message = getErrorMessage(caught, 'Unable to continue with Google. Please try again.')
+      setFormError(message)
+      toast.error('Google sign-in failed', message)
+    } finally {
+      googleSubmittingRef.current = false
+      setGoogleSubmitting(false)
     }
   }
 
@@ -193,10 +262,33 @@ export default function SignUpPage() {
           </p>
         )}
 
-        <Button type="submit" loading={submitting} fullWidth size="lg">
+        <Button
+          type="submit"
+          loading={submitting}
+          disabled={googleSubmitting}
+          fullWidth
+          size="lg"
+        >
           Create account
         </Button>
       </form>
+
+      {GOOGLE_CLIENT_ID && (
+        <div className="auth-google-section">
+          <div className="auth-divider"><span>or</span></div>
+          <Button
+            variant="outline"
+            size="lg"
+            fullWidth
+            loading={googleSubmitting}
+            disabled={submitting}
+            leftIcon={<span className="auth-google-mark" aria-hidden="true">G</span>}
+            onClick={() => void handleGoogleSignIn()}
+          >
+            Continue with Google
+          </Button>
+        </div>
+      )}
 
       <p className="auth-switch">
         Already have an account? <Link to={signInLink}>Sign in</Link>

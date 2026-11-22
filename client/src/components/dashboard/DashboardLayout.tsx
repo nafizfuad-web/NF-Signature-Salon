@@ -51,9 +51,14 @@ export default function DashboardLayout({ variant }: DashboardLayoutProps) {
   }
 
   const handleLogout = async () => {
-    await logout()
-    toast.info('Signed out', 'Your session has been closed on this device.')
-    navigate('/')
+    try {
+      await logout()
+      toast.info('Signed out', 'Your session has been cleared on this device.')
+    } catch {
+      toast.info('Signed out locally', 'The server could not be reached; this device has been signed out.')
+    } finally {
+      navigate('/')
+    }
   }
 
   const initials = user ? getInitials(user.name) : null

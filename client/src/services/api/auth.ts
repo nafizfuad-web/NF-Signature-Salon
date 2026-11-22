@@ -11,17 +11,46 @@ export interface RegisterResponse {
   user: AuthUser
 }
 
-function asRecord(value: unknown): Record<string, unknown> {
-  return value && typeof value === 'object' ? (value as Record<string, unknown>) : {}
+function asRecord(value: unknown): Record<string, unknown> | null {
+  return value && typeof value === 'object' && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : null
+}
+
+export function parseAuthUser(value: unknown): AuthUser | null {
+  const record = asRecord(value)
+  if (
+    !record ||
+    typeof record.id !== 'string' ||
+    !record.id ||
+    typeof record.name !== 'string' ||
+    !record.name ||
+    typeof record.email !== 'string' ||
+    !record.email ||
+    (record.role !== 'customer' && record.role !== 'admin') ||
+    (record.phone !== undefined && typeof record.phone !== 'string') ||
+    (record.createdAt !== undefined && typeof record.createdAt !== 'string')
+  ) {
+    return null
+  }
+
+  return {
+    id: record.id,
+    name: record.name,
+    email: record.email,
+    role: record.role,
+    ...(typeof record.phone === 'string' ? { phone: record.phone } : {}),
+    ...(typeof record.createdAt === 'string' ? { createdAt: record.createdAt } : {}),
+  }
 }
 
 function extractAuthPayload(payload: unknown): { token?: string; user?: unknown } {
   const record = asRecord(payload)
-  const data = asRecord(record.data)
-  const tokenValue = record.token ?? data.token
+  const data = asRecord(record?.data)
+  const tokenValue = record?.token ?? data?.token
   return {
     token: typeof tokenValue === 'string' ? tokenValue : undefined,
-    user: record.user ?? data.user,
+    user: record?.user ?? data?.user,
   }
 }
 
@@ -33,40 +62,43 @@ function unexpectedResponse(message: string): ApiError {
 
 export async function login(credentials: LoginCredentials): Promise<AuthResponse> {
   const payload = await apiPost<unknown>('/auth/login', credentials, { auth: false })
-  const { token, user } = extractAuthPayload(payload)
+  const { token, user: rawUser } = extractAuthPayload(payload)
+  const user = parseAuthUser(rawUser)
 
-  if (!token || !user || typeof user !== 'object') {
+  if (!token || !user) {
     throw unexpectedResponse(
       'The server returned an unexpected sign-in response. Please try again.'
     )
   }
 
-  return { token, user: user as AuthUser }
+  return { token, user }
 }
 
 export async function register(data: RegisterData): Promise<RegisterResponse> {
   const payload = await apiPost<unknown>('/auth/register', data, { auth: false })
-  const { token, user } = extractAuthPayload(payload)
+  const { token, user: rawUser } = extractAuthPayload(payload)
+  const user = parseAuthUser(rawUser)
 
-  if (!user || typeof user !== 'object') {
+  if (!user) {
     throw unexpectedResponse(
       'The server returned an unexpected registration response. Please try again.'
     )
   }
 
-  return { token, user: user as AuthUser }
+  return { ...(token ? { token } : {}), user }
 }
 
 export async function getCurrentUser(): Promise<AuthUser> {
   const payload = await apiGet<unknown>('/auth/me')
   const record = asRecord(payload)
-  const user = record.user ?? record.data ?? payload
+  const data = asRecord(record?.data)
+  const user = parseAuthUser(record?.user ?? data?.user ?? record?.data ?? payload)
 
-  if (!user || typeof user !== 'object') {
+  if (!user) {
     throw unexpectedResponse('The server returned an unexpected account response.')
   }
 
-  return user as AuthUser
+  return user
 }
 
 export async function logout(): Promise<void> {

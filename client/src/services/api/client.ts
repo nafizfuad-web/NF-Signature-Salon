@@ -39,7 +39,10 @@ function readMessage(payload: unknown): string | undefined {
   return typeof candidate === 'string' && candidate.trim() ? candidate : undefined
 }
 
-async function handleResponse<T>(response: Response): Promise<T> {
+async function handleResponse<T>(
+  response: Response,
+  requestToken: string | null
+): Promise<T> {
   const text = await response.text()
   let payload: unknown
 
@@ -58,8 +61,14 @@ async function handleResponse<T>(response: Response): Promise<T> {
         ? 'Your session has expired. Please sign in again.'
         : `Request failed (${response.status} ${response.statusText})`)
 
-    // Let AuthProvider know that a stored token is no longer valid.
-    if (response.status === 401 && getStoredToken()) {
+    // Let AuthProvider know that the token used for this request is no longer
+    // valid. Only invalidate that exact token: a slow 401 from an older request
+    // must never clear a newer session created by a successful login.
+    if (
+      response.status === 401 &&
+      requestToken &&
+      getStoredToken() === requestToken
+    ) {
       window.dispatchEvent(new Event('nf:unauthorized'))
     }
 
@@ -75,14 +84,14 @@ export async function apiRequest<T>(
 ): Promise<T> {
   const { body, auth = true, headers: initialHeaders, ...rest } = options
   const headers = new Headers(initialHeaders)
+  const requestToken = auth ? getStoredToken() : null
 
   if (body !== undefined && !(body instanceof FormData)) {
     headers.set('Content-Type', 'application/json')
   }
 
-  if (auth) {
-    const token = getStoredToken()
-    if (token) headers.set('Authorization', `Bearer ${token}`)
+  if (requestToken) {
+    headers.set('Authorization', `Bearer ${requestToken}`)
   }
 
   let response: Response
@@ -103,7 +112,7 @@ export async function apiRequest<T>(
     )
   }
 
-  return handleResponse<T>(response)
+  return handleResponse<T>(response, requestToken)
 }
 
 export function apiGet<T>(
