@@ -8,7 +8,12 @@ import DashboardCard from '@/components/dashboard/DashboardCard'
 import DashboardPageHeader from '@/components/dashboard/DashboardPageHeader'
 import { useAuth } from '@/hooks/useAuth'
 import { useToast } from '@/hooks/useToast'
-import { updateCustomerProfile } from '@/services/api/customer'
+import {
+  removeCustomerAvatar,
+  updateCustomerProfile,
+  uploadCustomerAvatar,
+} from '@/services/api/customer'
+import { resolveAssetUrl } from '@/services/config'
 import { formatDate, getInitials } from '@/utils/format'
 import { getErrorMessage } from '@/utils/errors'
 
@@ -21,11 +26,15 @@ function CustomerProfileContent() {
   const [name, setName] = useState(user?.name ?? '')
   const [email, setEmail] = useState(user?.email ?? '')
   const [phone, setPhone] = useState(user?.phone ?? '')
+  const [avatarFile, setAvatarFile] = useState<File | null>(null)
   const [errors, setErrors] = useState<{ name?: string; email?: string; phone?: string }>({})
   const [formError, setFormError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
+  const [uploadingAvatar, setUploadingAvatar] = useState(false)
 
   if (!user) return null
+
+  const avatarUrl = resolveAssetUrl(user.avatarUrl)
 
   const validate = () => {
     const next: { name?: string; email?: string; phone?: string } = {}
@@ -59,6 +68,49 @@ function CustomerProfileContent() {
       toast.error('Could not save your profile', message)
     } finally {
       setSaving(false)
+    }
+  }
+
+  const handleAvatarChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0] ?? null
+    if (!file) return
+    if (!file.type.startsWith('image/')) {
+      toast.error('Invalid file', 'Please upload an image file.')
+      return
+    }
+    if (file.size > 2 * 1024 * 1024) {
+      toast.error('File too large', 'Image must be 2 MB or smaller.')
+      return
+    }
+    setAvatarFile(file)
+  }
+
+  const handleUploadAvatar = async () => {
+    if (!avatarFile) return
+    setUploadingAvatar(true)
+    try {
+      const updated = await uploadCustomerAvatar(avatarFile)
+      updateUser(updated)
+      setAvatarFile(null)
+      toast.success('Profile picture updated', 'Your new profile picture has been saved.')
+    } catch (caught) {
+      const message = getErrorMessage(caught, 'Unable to upload profile picture.')
+      toast.error('Upload failed', message)
+    } finally {
+      setUploadingAvatar(false)
+    }
+  }
+
+  const handleRemoveAvatar = async () => {
+    if (!window.confirm('Remove your profile picture?')) return
+    try {
+      const updated = await removeCustomerAvatar()
+      updateUser(updated)
+      setAvatarFile(null)
+      toast.success('Profile picture removed', 'Your profile picture has been removed.')
+    } catch (caught) {
+      const message = getErrorMessage(caught, 'Unable to remove profile picture.')
+      toast.error('Remove failed', message)
     }
   }
 
@@ -114,6 +166,27 @@ function CustomerProfileContent() {
               autoComplete="tel"
             />
 
+            <label style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginTop: '1rem' }}>
+              <span style={{ flex: 1 }}>Profile picture</span>
+              <input
+                type="file"
+                accept="image/*"
+                onChange={handleAvatarChange}
+                disabled={uploadingAvatar}
+              />
+              {avatarFile && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={handleUploadAvatar}
+                  disabled={uploadingAvatar}
+                >
+                  Upload
+                </Button>
+              )}
+            </label>
+
             <div className="profile-form-actions">
               <Button type="submit" loading={saving} leftIcon={<Icon name="check" size={16} />}>
                 Save changes
@@ -125,7 +198,13 @@ function CustomerProfileContent() {
 
         <DashboardCard title="Account summary">
           <div className="account-summary">
-            <span className="account-avatar" aria-hidden="true">{initials}</span>
+            <span className="account-avatar" aria-hidden="true">
+              {avatarUrl ? (
+                <img src={avatarUrl} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%' }} />
+              ) : (
+                initials
+              )}
+            </span>
             <div className="account-summary-copy">
               <h3>{user.name}</h3>
               <p>{user.email}</p>
@@ -133,6 +212,16 @@ function CustomerProfileContent() {
                 {user.role === 'admin' ? 'Administrator' : 'Customer'}
               </span>
             </div>
+            {user.avatarUrl && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleRemoveAvatar}
+                disabled={uploadingAvatar}
+              >
+                Remove picture
+              </Button>
+            )}
           </div>
 
           <dl className="account-facts">

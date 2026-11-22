@@ -1,4 +1,4 @@
-import { apiGet, buildQuery, isApiError } from '@/services/api/client'
+import { apiGet, buildQuery } from '@/services/api/client'
 import { SALON_LOCATION } from '@/services/salonConfig'
 
 export interface AvailabilityQuery {
@@ -32,23 +32,14 @@ export async function fetchAvailableSlots({
   serviceId,
   date,
 }: AvailabilityQuery): Promise<string[]> {
-  // The backend must enforce opening days, holidays, staff schedules, duration,
-  // and existing reservations before returning slots; the client never creates slots.
+  // The server enforces opening days, service duration and existing bookings
+  // before it returns any slot; the client never invents availability.
   const query = buildQuery({
     serviceId,
     date,
     location: SALON_LOCATION.displayAddress,
   })
 
-  try {
-    const payload = await apiGet<unknown>(`/appointments/availability${query}`)
-    return extractSlots(payload)
-  } catch (error) {
-    if (isApiError(error) && (error.status === 404 || error.status === 501)) {
-      throw new Error(
-        'Live availability search is not configured. The server must provide GET /appointments/availability.'
-      )
-    }
-    throw error
-  }
+  const payload = await apiGet<unknown>(`/appointments/availability${query}`)
+  return extractSlots(payload)
 }

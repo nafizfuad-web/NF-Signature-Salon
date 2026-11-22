@@ -15,7 +15,7 @@ import ServiceImage from '@/components/services/ServiceImage'
 import { useAuth } from '@/hooks/useAuth'
 import { useServices } from '@/hooks/useServices'
 import { useToast } from '@/hooks/useToast'
-import { BOOKING_IS_DEMO, createAppointment } from '@/services/api/appointments'
+import { createAppointment } from '@/services/api/appointments'
 import { fetchAvailableSlots } from '@/services/api/availability'
 import type { Appointment } from '@/types'
 import { cn } from '@/lib/cn'
@@ -177,23 +177,13 @@ export default function BookingPage() {
     try {
       const appointment = await createAppointment({
         serviceId: selectedService.id,
-        serviceTitle: selectedService.title,
         date,
         time,
-        name: name.trim(),
-        email: email.trim(),
-        phone: phone.trim(),
+        phone: phone.trim() || undefined,
         notes: notes.trim() || undefined,
-        price: selectedService.price,
-        duration: selectedService.duration,
       })
       setConfirmation(appointment)
-      toast.success(
-        BOOKING_IS_DEMO ? 'Demo booking created' : 'Appointment requested',
-        BOOKING_IS_DEMO
-          ? 'This preview was not saved to the database.'
-          : 'The salon will confirm your appointment by email.'
-      )
+      toast.success('Appointment requested', 'The salon will confirm your appointment by email.')
     } catch (caught) {
       const message = getErrorMessage(caught, 'Your appointment could not be requested. Please try again.')
       setSubmitError(message)
@@ -231,7 +221,6 @@ export default function BookingPage() {
           <div className="section-container booking-confirmation-wrap">
             <BookingConfirmation
               appointment={confirmation}
-              isDemo={BOOKING_IS_DEMO}
               onBookAnother={resetBooking}
             />
           </div>
@@ -258,14 +247,6 @@ export default function BookingPage() {
               maxReached={maxReached}
               onStepClick={goToStep}
             />
-
-            {BOOKING_IS_DEMO && (
-              <p className="booking-demo-banner" role="note">
-                <Icon name="info" size={16} />
-                Demo mode is on. You can preview the full flow, but no appointment will be saved
-                until the booking API is connected.
-              </p>
-            )}
 
             {stepError && (
               <p className="form-error booking-step-error" role="alert">
@@ -490,7 +471,7 @@ export default function BookingPage() {
                       Back
                     </Button>
                     <Button type="submit" loading={submitting} rightIcon={<Icon name="check" size={16} />}>
-                      {BOOKING_IS_DEMO ? 'Preview booking request' : 'Request appointment'}
+                      Request appointment
                     </Button>
                   </div>
                 </form>

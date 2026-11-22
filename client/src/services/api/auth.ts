@@ -29,6 +29,7 @@ export function parseAuthUser(value: unknown): AuthUser | null {
     !record.email ||
     (record.role !== 'customer' && record.role !== 'admin') ||
     (record.phone !== undefined && typeof record.phone !== 'string') ||
+    (record.avatarUrl !== undefined && typeof record.avatarUrl !== 'string') ||
     (record.createdAt !== undefined && typeof record.createdAt !== 'string')
   ) {
     return null
@@ -40,6 +41,7 @@ export function parseAuthUser(value: unknown): AuthUser | null {
     email: record.email,
     role: record.role,
     ...(typeof record.phone === 'string' ? { phone: record.phone } : {}),
+    ...(typeof record.avatarUrl === 'string' ? { avatarUrl: record.avatarUrl } : {}),
     ...(typeof record.createdAt === 'string' ? { createdAt: record.createdAt } : {}),
   }
 }

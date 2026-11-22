@@ -11,9 +11,10 @@ import TableSkeleton from '@/components/dashboard/TableSkeleton'
 import { useApiResource } from '@/hooks/useApiResource'
 import { useAuth } from '@/hooks/useAuth'
 import { useToast } from '@/hooks/useToast'
-import { fetchCustomerAppointments } from '@/services/api/customer'
+import { cancelCustomerAppointment, fetchCustomerAppointments } from '@/services/api/customer'
 import type { Appointment, AppointmentStatus } from '@/types'
 import { cn } from '@/lib/cn'
+import { getErrorMessage } from '@/utils/errors'
 
 type StatusFilter = AppointmentStatus | 'all'
 
@@ -33,6 +34,8 @@ function CustomerAppointmentsContent() {
     [user?.id]
   )
   const [status, setStatus] = useState<StatusFilter>('all')
+  const [updatingId, setUpdatingId] = useState<string | null>(null)
+  const [updatingStatus, setUpdatingStatus] = useState<AppointmentStatus | null>(null)
   const lastError = useRef<string | null>(null)
 
   useEffect(() => {
@@ -41,6 +44,24 @@ function CustomerAppointmentsContent() {
       toast.error('Could not load your appointments', error)
     }
   }, [error, toast])
+
+  async function handleCancel(appointmentId: string) {
+    if (!window.confirm('Are you sure you want to cancel this appointment?')) return
+
+    setUpdatingId(appointmentId)
+    setUpdatingStatus('cancelled')
+    try {
+      await cancelCustomerAppointment(appointmentId)
+      toast.success('Appointment cancelled', 'Your appointment has been cancelled.')
+      refetch()
+    } catch (caught) {
+      const message = getErrorMessage(caught, 'Unable to cancel appointment.')
+      toast.error('Cancellation failed', message)
+    } finally {
+      setUpdatingId(null)
+      setUpdatingStatus(null)
+    }
+  }
 
   const appointments = useMemo(() => {
     const all = data ?? []
@@ -118,7 +139,13 @@ function CustomerAppointmentsContent() {
             />
           </div>
         ) : (
-          <AppointmentTable appointments={appointments} variant="customer" />
+          <AppointmentTable
+            appointments={appointments}
+            variant="customer"
+            onStatusChange={handleCancel}
+            updatingId={updatingId}
+            updatingStatus={updatingStatus}
+          />
         )}
       </DashboardCard>
     </>

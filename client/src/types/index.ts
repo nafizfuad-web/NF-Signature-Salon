@@ -55,15 +55,10 @@ export interface BookingFormData {
 /** Payload sent to the API when a customer requests an appointment. */
 export interface CreateAppointmentPayload {
   serviceId: string
-  serviceTitle: string
   date: string
   time: string
-  name: string
-  email: string
-  phone: string
+  phone?: string
   notes?: string
-  price?: string
-  duration?: string
 }
 
 /* -------------------------------------------------------------------------- */
@@ -77,6 +72,7 @@ export interface AuthUser {
   name: string
   email: string
   phone?: string
+  avatarUrl?: string
   role: UserRole
   createdAt?: string
 }
@@ -114,6 +110,7 @@ export interface Appointment {
   id: string
   serviceId: string
   serviceTitle: string
+  category?: ServiceCategory
   date: string
   time: string
   duration?: string
@@ -123,6 +120,7 @@ export interface Appointment {
   notes?: string
   customerName?: string
   customerEmail?: string
+  customerPhone?: string
   createdAt?: string
 }
 

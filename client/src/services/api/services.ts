@@ -1,14 +1,11 @@
-// NF Signature Salon — service catalog API
+// NF Signature Salon — service catalogue API
 //
-// When VITE_USE_MOCK_DATA=false these functions call the Express endpoints:
+// Reads the live MongoDB-backed catalogue from the Express backend:
 //   GET /services
 //   GET /services/:id
 
-import { apiGet, buildQuery, type ApiError } from '@/services/api/client'
-import { USE_MOCK_DATA } from '@/services/config'
-import { mockDelay, services as mockServices } from '@/services/mockData'
+import { apiGet, buildQuery } from '@/services/api/client'
 import type { ServiceCategory, ServiceItem, ServiceQuery } from '@/types'
-import { parsePrice } from '@/utils/format'
 
 const VALID_CATEGORIES: ServiceCategory[] = ['hair', 'skin', 'nails', 'wellness']
 
@@ -100,57 +97,16 @@ function extractService(payload: unknown): unknown {
   return record.service ?? record.data ?? payload
 }
 
-function filterAndSortMock(query: ServiceQuery = {}): ServiceItem[] {
-  const search = query.search?.trim().toLowerCase() ?? ''
-  const category = query.category && query.category !== 'all' ? query.category : undefined
-
-  const filtered = mockServices.filter((service) => {
-    const matchesSearch =
-      !search ||
-      [service.title, service.description, service.category]
-        .join(' ')
-        .toLowerCase()
-        .includes(search)
-    const matchesCategory = !category || service.category === category
-    return matchesSearch && matchesCategory
-  })
-
-  if (query.sort === 'price-asc') {
-    return [...filtered].sort((a, b) => parsePrice(a.price) - parsePrice(b.price))
-  }
-  if (query.sort === 'price-desc') {
-    return [...filtered].sort((a, b) => parsePrice(b.price) - parsePrice(a.price))
-  }
-  return filtered
-}
-
 export async function fetchServices(query: ServiceQuery = {}): Promise<ServiceItem[]> {
-  if (USE_MOCK_DATA) {
-    await mockDelay()
-    return filterAndSortMock(query)
-  }
-
   const params = buildQuery({
     search: query.search,
     category: query.category === 'all' ? undefined : query.category,
-    sort: query.sort === 'recommended' ? undefined : query.sort,
   })
   const payload = await apiGet<unknown>(`/services${params}`)
   return extractServiceList(payload).map(normalizeService).filter((service) => service.id)
 }
 
 export async function fetchServiceById(id: string): Promise<ServiceItem> {
-  if (USE_MOCK_DATA) {
-    await mockDelay(300)
-    const service = mockServices.find((item) => item.id === id)
-    if (!service) {
-      const error: ApiError = new Error('We could not find that service.')
-      error.status = 404
-      throw error
-    }
-    return service
-  }
-
   const payload = await apiGet<unknown>(`/services/${encodeURIComponent(id)}`)
   return normalizeService(extractService(payload))
 }

@@ -16,6 +16,8 @@ function externalUrl(value: string | undefined): string | undefined {
   }
 }
 
+const CITY = 'Pabna, Bangladesh'
+
 const socialLinks = [
   { label: 'Instagram', url: externalUrl(import.meta.env.VITE_SALON_INSTAGRAM_URL) },
   { label: 'Facebook', url: externalUrl(import.meta.env.VITE_SALON_FACEBOOK_URL) },
@@ -25,13 +27,13 @@ const socialLinks = [
 export const SALON_LOCATION = {
   name: 'NF Signature Salon',
   country: 'Bangladesh',
-  city: 'Dhaka, Bangladesh',
+  city: CITY,
   address: import.meta.env.VITE_SALON_ADDRESS?.trim() ?? '',
   postalCode: import.meta.env.VITE_SALON_POSTAL_CODE?.trim() ?? '',
   displayAddress: [
     import.meta.env.VITE_SALON_ADDRESS?.trim(),
     import.meta.env.VITE_SALON_POSTAL_CODE?.trim(),
-    'Dhaka, Bangladesh',
+    CITY,
   ].filter(Boolean).join(', '),
   latitude: configuredCoordinate(import.meta.env.VITE_SALON_LATITUDE, -90, 90),
   longitude: configuredCoordinate(import.meta.env.VITE_SALON_LONGITUDE, -180, 180),
@@ -48,6 +50,3 @@ export const SALON_LOCATION = {
   ],
   socialLinks,
 }
-
-export const GOOGLE_MAPS_API_KEY =
-  import.meta.env.VITE_GOOGLE_MAPS_API_KEY?.trim() ?? ''

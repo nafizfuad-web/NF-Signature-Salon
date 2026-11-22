@@ -5,18 +5,15 @@ import { formatDateLong } from '@/utils/format'
 import type { Appointment } from '@/types'
 
 // NF Signature Salon — Booking confirmation
-// Shown after a booking request succeeds. In mock mode the record is clearly
-// labelled as a demo so it is never mistaken for a saved database row.
+// Shown after a booking request succeeds.
 
 interface BookingConfirmationProps {
   appointment: Appointment
-  isDemo: boolean
   onBookAnother: () => void
 }
 
 export default function BookingConfirmation({
   appointment,
-  isDemo,
   onBookAnother,
 }: BookingConfirmationProps) {
   return (
@@ -26,17 +23,8 @@ export default function BookingConfirmation({
       </span>
       <h2>Appointment request received</h2>
       <p>
-        {isDemo
-          ? 'Demo mode is on, so this request was not saved to a database. It shows how the confirmation will look once the booking API is connected.'
-          : 'The salon will confirm your appointment by email. Please arrive a few minutes early.'}
+        The salon will confirm your appointment by email. Please arrive a few minutes early.
       </p>
-
-      {isDemo && (
-        <p className="booking-demo-badge" role="note">
-          <Icon name="alert-circle" size={15} />
-          Demo confirmation — no appointment has been saved.
-        </p>
-      )}
 
       <dl className="booking-confirmation-facts">
         <div>

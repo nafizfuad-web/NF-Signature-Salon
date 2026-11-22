@@ -1,16 +1,16 @@
 // NF Signature Salon — customer account API
 //
-// Endpoints expected from the Express backend:
-//   GET   /customers/me/dashboard
-//   GET   /customers/me/appointments
-//   PATCH /customers/me
+// Live endpoints served by the Express backend:
+//   GET    /customers/me/dashboard
+//   GET    /customers/me/appointments
+//   PATCH  /customers/me
+//   POST   /customers/me/avatar
+//   DELETE /customers/me/avatar
+//   PATCH  /appointments/:id/cancel
 //
-// Catalog-style dashboard data uses development fixtures while
-// VITE_USE_MOCK_DATA is enabled. Profile updates always call the API.
+// Every request is authenticated and the server scopes it to the signed-in user.
 
-import { apiGet, apiPatch } from '@/services/api/client'
-import { USE_MOCK_DATA } from '@/services/config'
-import { mockAppointments, mockCustomerDashboard, mockDelay } from '@/services/mockData'
+import { apiDelete, apiGet, apiPatch, apiPost } from '@/services/api/client'
 import type {
   Appointment,
   AuthUser,
@@ -30,12 +30,12 @@ function extractAppointments(payload: unknown): Appointment[] {
   return []
 }
 
-export async function fetchCustomerDashboard(): Promise<CustomerDashboardData> {
-  if (USE_MOCK_DATA) {
-    await mockDelay()
-    return mockCustomerDashboard
-  }
+function extractUser(payload: unknown): AuthUser {
+  const record = asRecord(payload)
+  return (record.user ?? record.data ?? payload) as AuthUser
+}
 
+export async function fetchCustomerDashboard(): Promise<CustomerDashboardData> {
   const payload = await apiGet<unknown>('/customers/me/dashboard')
   const record = asRecord(payload)
   const data = asRecord(record.data)
@@ -43,17 +43,33 @@ export async function fetchCustomerDashboard(): Promise<CustomerDashboardData> {
 }
 
 export async function fetchCustomerAppointments(): Promise<Appointment[]> {
-  if (USE_MOCK_DATA) {
-    await mockDelay()
-    return mockAppointments
-  }
-
   const payload = await apiGet<unknown>('/customers/me/appointments')
   return extractAppointments(payload)
 }
 
 export async function updateCustomerProfile(update: ProfileUpdate): Promise<AuthUser> {
   const payload = await apiPatch<unknown>('/customers/me', update)
+  return extractUser(payload)
+}
+
+export async function uploadCustomerAvatar(file: File): Promise<AuthUser> {
+  const form = new FormData()
+  form.append('avatar', file)
+  const payload = await apiPost<unknown>('/customers/me/avatar', form)
+  return extractUser(payload)
+}
+
+export async function removeCustomerAvatar(): Promise<AuthUser> {
+  const payload = await apiDelete<unknown>('/customers/me/avatar')
+  return extractUser(payload)
+}
+
+export async function cancelCustomerAppointment(
+  appointmentId: string
+): Promise<Appointment> {
+  const payload = await apiPatch<unknown>(
+    `/appointments/${encodeURIComponent(appointmentId)}/cancel`
+  )
   const record = asRecord(payload)
-  return (record.user ?? record.data ?? payload) as AuthUser
+  return (record.data ?? payload) as Appointment
 }

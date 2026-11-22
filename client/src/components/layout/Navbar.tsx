@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react'
 import { NAV_LINKS } from '@/utils/constants'
 import Icon from '@/components/common/Icon'
 import { useAuth } from '@/hooks/useAuth'
+import { resolveAssetUrl } from '@/services/config'
 import { getInitials } from '@/utils/format'
 
 export default function Navbar() {
@@ -127,7 +128,20 @@ export default function Navbar() {
               user ? (
                 <Link to={dashboardPath} className="navbar-account" aria-label="Open my dashboard">
                   <span className="navbar-avatar" aria-hidden="true">
-                    {getInitials(user.name)}
+                    {user.avatarUrl ? (
+                      <img
+                        src={resolveAssetUrl(user.avatarUrl)}
+                        alt=""
+                        style={{
+                          width: '100%',
+                          height: '100%',
+                          objectFit: 'cover',
+                          borderRadius: '50%',
+                        }}
+                      />
+                    ) : (
+                      getInitials(user.name)
+                    )}
                   </span>
                   <span className="navbar-account-label">Dashboard</span>
                 </Link>

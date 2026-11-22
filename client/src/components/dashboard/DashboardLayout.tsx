@@ -5,6 +5,7 @@ import Icon, { type IconName } from '@/components/common/Icon'
 import { useAuth } from '@/hooks/useAuth'
 import { useToast } from '@/hooks/useToast'
 import { cn } from '@/lib/cn'
+import { resolveAssetUrl } from '@/services/config'
 import { getInitials } from '@/utils/format'
 
 interface DashboardLayoutProps {
@@ -115,7 +116,20 @@ export default function DashboardLayout({ variant }: DashboardLayoutProps) {
         <div className="dashboard-sidebar-footer">
           <div className="dashboard-user">
             <span className="dashboard-avatar" aria-hidden="true">
-              {initials ?? <Icon name="user" size={17} />}
+              {user?.avatarUrl ? (
+                <img
+                  src={resolveAssetUrl(user.avatarUrl)}
+                  alt=""
+                  style={{
+                    width: '100%',
+                    height: '100%',
+                    objectFit: 'cover',
+                    borderRadius: '50%',
+                  }}
+                />
+              ) : (
+                initials ?? <Icon name="user" size={17} />
+              )}
             </span>
             <div className="dashboard-user-copy">
               <p>{user?.name ?? 'Guest'}</p>
@@ -178,7 +192,20 @@ export default function DashboardLayout({ variant }: DashboardLayoutProps) {
             </Link>
             {user ? (
               <span className="dashboard-avatar dashboard-avatar-small" aria-hidden="true">
-                {initials}
+                {user.avatarUrl ? (
+                  <img
+                    src={resolveAssetUrl(user.avatarUrl)}
+                    alt=""
+                    style={{
+                      width: '100%',
+                      height: '100%',
+                      objectFit: 'cover',
+                      borderRadius: '50%',
+                    }}
+                  />
+                ) : (
+                  initials
+                )}
               </span>
             ) : (
               <Link to="/signin" className="dashboard-topbar-link">
