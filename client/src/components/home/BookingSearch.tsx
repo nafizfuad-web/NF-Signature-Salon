@@ -75,7 +75,7 @@ export default function BookingSearch() {
           <span className="hero-booking-label">Where?</span>
           <span className="hero-booking-value">
             <Icon name="map-pin" size={17} />
-          {SALON_LOCATION.displayAddress}
+            <span className="hero-booking-location-text">{SALON_LOCATION.city}</span>
           </span>
         </div>
 

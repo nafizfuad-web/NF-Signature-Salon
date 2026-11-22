@@ -121,6 +121,10 @@ export interface Appointment {
   customerName?: string
   customerEmail?: string
   customerPhone?: string
+  paymentStatus?: AppointmentPaymentStatus
+  paymentMethod?: PaymentMethodId
+  paidAt?: string
+  latestTransactionId?: string
   createdAt?: string
 }
 
@@ -162,6 +166,78 @@ export interface CustomerRecord {
 
 export interface BookingStatusUpdate {
   status: AppointmentStatus
+}
+
+/* -------------------------------------------------------------------------- */
+/* TEST payments (simulated only)                                             */
+/* -------------------------------------------------------------------------- */
+
+export type PaymentMethodId = 'stripe_demo' | 'bkash_demo' | 'nagad_demo' | 'pay_at_salon'
+export type AppointmentPaymentStatus = 'unpaid' | 'pending' | 'paid'
+export type PaymentTransactionStatus =
+  | 'pending'
+  | 'processing'
+  | 'succeeded'
+  | 'failed'
+  | 'cancelled'
+  | 'cash_pending'
+  | 'cash_received'
+export type PaymentSimulationOutcome = 'success' | 'failed' | 'cancelled'
+
+export interface PaymentMethod {
+  id: PaymentMethodId
+  label: string
+  provider: 'internal_simulator' | 'salon_cash'
+  requiresSimulation: boolean
+  simulated: true
+  environment: 'TEST'
+  currency: 'BDT'
+}
+
+export interface PaymentMethodsResponse {
+  enabled: boolean
+  environment: 'TEST'
+  currency: 'BDT'
+  amount: number | null
+  amountBasis: 'configured_test_demo'
+  simulated: true
+  methods: PaymentMethod[]
+  reason: string | null
+}
+
+export interface PaymentTransaction {
+  id: string
+  appointmentId: string
+  customerId: string
+  serviceId?: string
+  serviceTitle: string
+  appointmentDate: string
+  appointmentTime: string
+  displayPrice?: string
+  amount: number
+  currency: 'BDT'
+  amountBasis: 'configured_test_demo'
+  paymentMethod: PaymentMethodId
+  provider: 'internal_simulator' | 'salon_cash'
+  paymentStatus: PaymentTransactionStatus
+  environment: 'TEST' | 'LIVE'
+  simulated: boolean
+  simulationOutcome?: PaymentSimulationOutcome
+  failureReason?: string
+  paidAt?: string
+  cashConfirmedAt?: string
+  createdAt?: string
+  updatedAt?: string
+}
+
+export interface AppointmentPaymentState {
+  appointment: Appointment
+  transaction: PaymentTransaction | null
+  payment: {
+    status: AppointmentPaymentStatus
+    method?: PaymentMethodId
+    paidAt?: string
+  }
 }
 
 /* -------------------------------------------------------------------------- */

@@ -1,5 +1,5 @@
-import { useState } from 'react'
-import type { FormEvent } from 'react'
+import { useRef, useState } from 'react'
+import type { ChangeEvent, FormEvent } from 'react'
 import Button from '@/components/common/Button'
 import FormField from '@/components/common/FormField'
 import Icon from '@/components/common/Icon'
@@ -27,10 +27,14 @@ function CustomerProfileContent() {
   const [email, setEmail] = useState(user?.email ?? '')
   const [phone, setPhone] = useState(user?.phone ?? '')
   const [avatarFile, setAvatarFile] = useState<File | null>(null)
+  const avatarInputRef = useRef<HTMLInputElement>(null)
   const [errors, setErrors] = useState<{ name?: string; email?: string; phone?: string }>({})
   const [formError, setFormError] = useState<string | null>(null)
+  const [avatarError, setAvatarError] = useState<string | null>(null)
+  const [avatarStatus, setAvatarStatus] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
   const [uploadingAvatar, setUploadingAvatar] = useState(false)
+  const [removingAvatar, setRemovingAvatar] = useState(false)
 
   if (!user) return null
 
@@ -71,15 +75,23 @@ function CustomerProfileContent() {
     }
   }
 
-  const handleAvatarChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleAvatarChange = (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0] ?? null
     if (!file) return
+    setAvatarError(null)
+    setAvatarStatus(null)
     if (!file.type.startsWith('image/')) {
-      toast.error('Invalid file', 'Please upload an image file.')
+      const message = 'Please upload an image file.'
+      setAvatarError(message)
+      toast.error('Invalid file', message)
+      event.target.value = ''
       return
     }
     if (file.size > 2 * 1024 * 1024) {
-      toast.error('File too large', 'Image must be 2 MB or smaller.')
+      const message = 'Image must be 2 MB or smaller.'
+      setAvatarError(message)
+      toast.error('File too large', message)
+      event.target.value = ''
       return
     }
     setAvatarFile(file)
@@ -87,14 +99,20 @@ function CustomerProfileContent() {
 
   const handleUploadAvatar = async () => {
     if (!avatarFile) return
+    setAvatarError(null)
+    setAvatarStatus(null)
     setUploadingAvatar(true)
     try {
       const updated = await uploadCustomerAvatar(avatarFile)
       updateUser(updated)
       setAvatarFile(null)
-      toast.success('Profile picture updated', 'Your new profile picture has been saved.')
+      if (avatarInputRef.current) avatarInputRef.current.value = ''
+      const message = 'Your new profile picture has been saved.'
+      setAvatarStatus(message)
+      toast.success('Profile picture updated', message)
     } catch (caught) {
       const message = getErrorMessage(caught, 'Unable to upload profile picture.')
+      setAvatarError(message)
       toast.error('Upload failed', message)
     } finally {
       setUploadingAvatar(false)
@@ -103,14 +121,23 @@ function CustomerProfileContent() {
 
   const handleRemoveAvatar = async () => {
     if (!window.confirm('Remove your profile picture?')) return
+    setAvatarError(null)
+    setAvatarStatus(null)
+    setRemovingAvatar(true)
     try {
       const updated = await removeCustomerAvatar()
       updateUser(updated)
       setAvatarFile(null)
-      toast.success('Profile picture removed', 'Your profile picture has been removed.')
+      if (avatarInputRef.current) avatarInputRef.current.value = ''
+      const message = 'Your profile picture has been removed.'
+      setAvatarStatus(message)
+      toast.success('Profile picture removed', message)
     } catch (caught) {
       const message = getErrorMessage(caught, 'Unable to remove profile picture.')
+      setAvatarError(message)
       toast.error('Remove failed', message)
+    } finally {
+      setRemovingAvatar(false)
     }
   }
 
@@ -166,26 +193,68 @@ function CustomerProfileContent() {
               autoComplete="tel"
             />
 
-            <label style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginTop: '1rem' }}>
-              <span style={{ flex: 1 }}>Profile picture</span>
-              <input
-                type="file"
-                accept="image/*"
-                onChange={handleAvatarChange}
-                disabled={uploadingAvatar}
-              />
-              {avatarFile && (
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={handleUploadAvatar}
-                  disabled={uploadingAvatar}
-                >
-                  Upload
-                </Button>
-              )}
-            </label>
+            <div className="profile-avatar-control" aria-busy={uploadingAvatar || removingAvatar}>
+              <span className="profile-avatar-preview" aria-hidden="true">
+                {avatarUrl ? (
+                  <img src={avatarUrl} alt="" />
+                ) : (
+                  initials
+                )}
+              </span>
+              <div className="profile-avatar-content">
+                <strong>Profile picture</strong>
+                <p>Choose a JPG, PNG, WEBP or GIF image up to 2 MB.</p>
+                <div className="profile-avatar-actions">
+                  <input
+                    ref={avatarInputRef}
+                    className="profile-avatar-input"
+                    id="profile-avatar"
+                    type="file"
+                    accept="image/jpeg,image/png,image/webp,image/gif"
+                    onChange={handleAvatarChange}
+                    disabled={uploadingAvatar || removingAvatar}
+                    tabIndex={-1}
+                    aria-hidden="true"
+                  />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => avatarInputRef.current?.click()}
+                    disabled={uploadingAvatar || removingAvatar}
+                  >
+                    {user.avatarUrl ? 'Change picture' : 'Choose picture'}
+                  </Button>
+                  {avatarFile && (
+                    <Button
+                      type="button"
+                      size="sm"
+                      onClick={handleUploadAvatar}
+                      loading={uploadingAvatar}
+                      disabled={removingAvatar}
+                      leftIcon={<Icon name="check" size={15} />}
+                    >
+                      Upload
+                    </Button>
+                  )}
+                  {user.avatarUrl && (
+                    <Button
+                      type="button"
+                      variant="text"
+                      size="sm"
+                      onClick={handleRemoveAvatar}
+                      loading={removingAvatar}
+                      disabled={uploadingAvatar}
+                    >
+                      Remove
+                    </Button>
+                  )}
+                </div>
+                {avatarFile && <span className="profile-avatar-filename">{avatarFile.name}</span>}
+                {avatarError && <p className="profile-avatar-message" role="alert">{avatarError}</p>}
+                {avatarStatus && <p className="profile-avatar-message is-success" role="status">{avatarStatus}</p>}
+              </div>
+            </div>
 
             <div className="profile-form-actions">
               <Button type="submit" loading={saving} leftIcon={<Icon name="check" size={16} />}>
@@ -212,16 +281,6 @@ function CustomerProfileContent() {
                 {user.role === 'admin' ? 'Administrator' : 'Customer'}
               </span>
             </div>
-            {user.avatarUrl && (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={handleRemoveAvatar}
-                disabled={uploadingAvatar}
-              >
-                Remove picture
-              </Button>
-            )}
           </div>
 
           <dl className="account-facts">

@@ -12,6 +12,8 @@ interface AppointmentTableProps {
   onStatusChange?: (appointmentId: string, status: AppointmentStatus) => void
   updatingId?: string | null
   updatingStatus?: AppointmentStatus | null
+  onPay?: (appointment: Appointment) => void
+  paymentBusyId?: string | null
 }
 
 function nextActions(status: AppointmentStatus): AppointmentStatus[] {
@@ -20,12 +22,27 @@ function nextActions(status: AppointmentStatus): AppointmentStatus[] {
   return []
 }
 
+function paymentStatusLabel(appointment: Appointment): string | null {
+  if (appointment.paymentStatus === 'paid') return 'Paid'
+  if (appointment.paymentStatus === 'pending') return 'Payment pending'
+  return null
+}
+
+function canPay(appointment: Appointment): boolean {
+  return (
+    appointment.status === 'confirmed' &&
+    (appointment.paymentStatus ?? 'unpaid') === 'unpaid'
+  )
+}
+
 export default function AppointmentTable({
   appointments,
   variant,
   onStatusChange,
   updatingId,
   updatingStatus,
+  onPay,
+  paymentBusyId,
 }: AppointmentTableProps) {
   if (appointments.length === 0) {
     return (
@@ -45,10 +62,22 @@ export default function AppointmentTable({
   const renderActions = (appointment: Appointment) => {
     if (variant === 'customer') {
       return (
-        <Link to={`/services/${appointment.serviceId}`} className="table-action-link">
-          Book again
-          <Icon name="arrow-right" size={14} />
-        </Link>
+        <div className="table-actions">
+          <Link to={`/services/${appointment.serviceId}`} className="table-action-link">
+            Book again
+            <Icon name="arrow-right" size={14} />
+          </Link>
+          {canPay(appointment) && onPay && (
+            <Button
+              size="sm"
+              variant="primary"
+              loading={paymentBusyId === appointment.id}
+              onClick={() => onPay(appointment)}
+            >
+              Pay now
+            </Button>
+          )}
+        </div>
       )
     }
 
@@ -124,7 +153,12 @@ export default function AppointmentTable({
                 </td>
                 <td>{appointment.staffName ?? 'To be assigned'}</td>
                 <td><StatusBadge status={appointment.status} /></td>
-                <td>{appointment.price ?? '—'}</td>
+                <td>
+                  {appointment.price ?? '—'}
+                  {paymentStatusLabel(appointment) && (
+                    <span className="table-payment-status">{paymentStatusLabel(appointment)}</span>
+                  )}
+                </td>
                 <td>{renderActions(appointment)}</td>
               </tr>
             ))}
@@ -167,6 +201,12 @@ export default function AppointmentTable({
                 <dt>Price</dt>
                 <dd>{appointment.price ?? '—'}</dd>
               </div>
+              {variant === 'customer' && (
+                <div>
+                  <dt>Payment</dt>
+                  <dd>{paymentStatusLabel(appointment) ?? 'Unpaid'}</dd>
+                </div>
+              )}
             </dl>
 
             <div className="appointment-card-actions">{renderActions(appointment)}</div>

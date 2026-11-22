@@ -194,7 +194,7 @@ export default function ServiceDetailsPage() {
 
               <p className="booking-card-note">
                 <Icon name="shield" size={14} />
-                No payment details are collected online. Payment is arranged at the salon.
+                Payment is a simulated TEST demo after confirmation. No real money is charged.
               </p>
             </div>
 

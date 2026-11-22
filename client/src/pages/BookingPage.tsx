@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useMemo, useRef, useState } from 'react'
 import type { FormEvent } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import BookingConfirmation from '@/components/booking/BookingConfirmation'
@@ -20,6 +20,7 @@ import { fetchAvailableSlots } from '@/services/api/availability'
 import type { Appointment } from '@/types'
 import { cn } from '@/lib/cn'
 import { getErrorMessage } from '@/utils/errors'
+import { formatDate } from '@/utils/format'
 
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 const PHONE_PATTERN = /^[+0-9()\-\s]{7,24}$/
@@ -51,6 +52,7 @@ export default function BookingPage() {
   const [maxReached, setMaxReached] = useState(1)
   const [serviceId, setServiceId] = useState(initialServiceId)
   const [date, setDate] = useState('')
+  const dateInputRef = useRef<HTMLInputElement>(null)
   const [time, setTime] = useState('')
   const [slots, setSlots] = useState<string[] | null>(null)
   const [slotsLoading, setSlotsLoading] = useState(false)
@@ -92,6 +94,17 @@ export default function BookingPage() {
     setTime('')
     setSlots(null)
     setSlotsError('')
+  }
+
+  function openDatePicker() {
+    const dateInput = dateInputRef.current
+    if (!dateInput) return
+    if (typeof dateInput.showPicker === 'function') {
+      dateInput.showPicker()
+      return
+    }
+    dateInput.focus()
+    dateInput.click()
   }
 
   function handleContinueFromService() {
@@ -234,7 +247,7 @@ export default function BookingPage() {
       <PageHeader
         eyebrow="Book an appointment"
         title="Reserve your visit"
-        subtitle="Choose a service, pick a time and tell us how to reach you. No payment is collected online."
+        subtitle="Choose a service, pick a time and tell us how to reach you. TEST payment demos are available after confirmation."
         breadcrumbs={[{ label: 'Home', to: '/' }, { label: 'Booking' }]}
       />
 
@@ -335,16 +348,41 @@ export default function BookingPage() {
                 <h2 className="booking-panel-title">2. Choose a date &amp; time</h2>
 
                 <div className="booking-date-row">
-                  <label className="form-group">
-                    <span className="form-label">Appointment date</span>
-                    <input
-                      className="form-input"
-                      type="date"
-                      value={date}
-                      min={TODAY}
-                      onChange={(event) => handleDateChange(event.target.value)}
-                    />
-                  </label>
+                  <div className="form-group booking-date-group">
+                    <label className="form-label" htmlFor="booking-appointment-date">
+                      Appointment date
+                    </label>
+                    <div className="booking-date-input-wrap">
+                      <input
+                        ref={dateInputRef}
+                        id="booking-appointment-date"
+                        className="form-input"
+                        type="date"
+                        value={date}
+                        min={TODAY}
+                        onChange={(event) => handleDateChange(event.target.value)}
+                      />
+                      <button
+                        type="button"
+                        className="booking-date-picker-button"
+                        onClick={openDatePicker}
+                        aria-label="Open appointment date calendar"
+                        title="Open calendar"
+                      >
+                        <Icon name="calendar" size={18} />
+                      </button>
+                    </div>
+                    <p className="booking-date-display" aria-live="polite">
+                      {date
+                        ? <>Selected date: <strong>{formatDate(date, {
+                          weekday: undefined,
+                          month: 'short',
+                          day: 'numeric',
+                          year: 'numeric',
+                        })}</strong></>
+                        : 'Select a date to continue.'}
+                    </p>
+                  </div>
                   <Button
                     variant="outline"
                     onClick={handleCheckAvailability}

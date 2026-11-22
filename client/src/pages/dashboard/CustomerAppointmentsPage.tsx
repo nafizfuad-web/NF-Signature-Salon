@@ -7,6 +7,8 @@ import AppointmentTable from '@/components/dashboard/AppointmentTable'
 import DashboardAccessGate from '@/components/dashboard/DashboardAccessGate'
 import DashboardCard from '@/components/dashboard/DashboardCard'
 import DashboardPageHeader from '@/components/dashboard/DashboardPageHeader'
+import PaymentHistory from '@/components/payments/PaymentHistory'
+import PaymentPanel from '@/components/payments/PaymentPanel'
 import TableSkeleton from '@/components/dashboard/TableSkeleton'
 import { useApiResource } from '@/hooks/useApiResource'
 import { useAuth } from '@/hooks/useAuth'
@@ -36,6 +38,8 @@ function CustomerAppointmentsContent() {
   const [status, setStatus] = useState<StatusFilter>('all')
   const [updatingId, setUpdatingId] = useState<string | null>(null)
   const [updatingStatus, setUpdatingStatus] = useState<AppointmentStatus | null>(null)
+  const [paymentTarget, setPaymentTarget] = useState<Appointment | null>(null)
+  const [historyKey, setHistoryKey] = useState(0)
   const lastError = useRef<string | null>(null)
 
   useEffect(() => {
@@ -104,6 +108,19 @@ function CustomerAppointmentsContent() {
         })}
       </div>
 
+      {paymentTarget && (
+        <DashboardCard title="TEST payment" padded>
+          <PaymentPanel
+            appointment={paymentTarget}
+            onClose={() => setPaymentTarget(null)}
+            onChanged={() => {
+              setHistoryKey((key) => key + 1)
+              refetch()
+            }}
+          />
+        </DashboardCard>
+      )}
+
       <DashboardCard padded={false}>
         {loading ? (
           <div className="dashboard-card-pad">
@@ -145,8 +162,16 @@ function CustomerAppointmentsContent() {
             onStatusChange={handleCancel}
             updatingId={updatingId}
             updatingStatus={updatingStatus}
+            onPay={(appointment) => setPaymentTarget(appointment)}
           />
         )}
+      </DashboardCard>
+
+      <DashboardCard
+        title="TEST payment history"
+        description="Simulated payments only. No real money is charged."
+      >
+        <PaymentHistory refreshKey={historyKey} />
       </DashboardCard>
     </>
   )

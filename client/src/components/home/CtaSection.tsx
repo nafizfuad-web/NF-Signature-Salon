@@ -25,7 +25,7 @@ export default function CtaSection() {
           </div>
           <span className="cta-note">
             <Icon name="shield" size={14} />
-            No payment details are collected online.
+            TEST payment demos are available after confirmation.
           </span>
         </div>
       </div>
