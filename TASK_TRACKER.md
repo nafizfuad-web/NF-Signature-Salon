@@ -92,19 +92,48 @@
 
 ## ⛔ Pending Tasks — Server (Awaiting Approval)
 
-- [ ] Initialize Express server
-- [ ] Connect MongoDB (Mongoose)
-- [ ] Auth routes (register / login / JWT / me / logout)
+- [x] Initialize Express server
+- [x] Connect MongoDB (Mongoose)
+- [x] Auth routes (register / login / JWT / me / logout) — audited & verified 2026-11-22
 - [ ] Services API routes
 - [ ] Availability calculation (opening hours, holidays, staff, duration, active bookings)
 - [ ] Appointment creation with server-side slot revalidation
 - [ ] Customer dashboard/profile endpoints
 - [ ] Admin dashboard/booking/service/customer endpoints
 - [ ] Contact delivery endpoint
-- [ ] Role middleware (`customer` / `admin`)
+- [x] Role middleware (`customer` / `admin`) — implemented
 - [ ] Payment integration (out of current scope)
 
 See `client/API_CONTRACTS.md` for the exact request/response shapes.
+
+---
+
+## 🔐 Authentication Audit — 2026-11-22
+
+**Status:** ✅ Email/password sign-up, login, session restore and logout verified end-to-end.
+
+Findings:
+- `409` on sign-up = the email already existed (expected guard) and, in the old
+  client, a double-submit race could send two registrations (first 201, second 409).
+  Fixed with synchronous submit locks on both auth forms.
+- `401` on login = the password did not match the stored hash for that account,
+  and the old client could clear a fresh session when a late 401 from the previous
+  `/auth/me` restore arrived. Fixed with a session-generation guard and by only
+  invalidating the exact token that produced the 401.
+- Database audit: 15 users, all with valid `$2b$` bcrypt hashes, normalized emails,
+  unique `email_1` index and sparse `googleId_1` index — no corrupted accounts.
+- Server auth hardening (validated env config, CORS, rate limiting, async token
+  validation, hidden password hash, optional Google OAuth) committed.
+- `.env` and `dist/` remain git-ignored in both repos; no secrets committed.
+
+Verification:
+- `cd salonbook-server && npm run test:auth` → all checks pass; throwaway user removed.
+- `cd client && npm run build && npm run lint` → pass.
+- Manual: register → sign out → sign in → dashboard.
+
+Account recovery (unknown/old password):
+`cd salonbook-server && npm run reset-password -- <email>` (hidden prompt or
+`RESET_PASSWORD`). Full details: `salonbook-server/AUTH.md`.
 
 ---
 
@@ -121,7 +150,7 @@ See `client/API_CONTRACTS.md` for the exact request/response shapes.
 ## 📊 Progress Summary
 
 ```
-Client:  ██████████  100% (frontend complete, backend pending)
-Server:  ░░░░░░░░░░    0% (Awaiting approval)
-Overall: █████░░░░░   50%
+Client:  ██████████  100% (frontend complete)
+Server:  █████░░░░░   50% (auth complete; booking/catalog APIs pending)
+Overall: ███████░░░   70%
 ```
