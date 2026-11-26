@@ -113,7 +113,7 @@ export default function AppointmentTable({
   return (
     <>
       <div className="table-wrap data-table-wrap">
-        <table className="data-table">
+        <table className={variant === 'admin' ? 'data-table data-table-admin' : 'data-table'}>
           <caption className="sr-only">
             {variant === 'admin' ? 'All customer bookings' : 'Your appointments'}
           </caption>

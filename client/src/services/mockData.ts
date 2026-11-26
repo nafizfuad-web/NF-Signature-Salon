@@ -180,10 +180,16 @@ export const mockAdminDashboard: AdminDashboardData = {
   stats: {
     todayBookings: 8,
     pendingBookings: 3,
+    confirmedBookings: 5,
+    cancelledBookings: 1,
+    completedBookings: 4,
+    totalAppointments: mockAdminBookings.length,
+    successfulPayments: 2,
     activeServices: services.length,
     totalCustomers: 128,
   },
   recentBookings: mockAdminBookings.slice(0, 5),
+  recentTransactions: [],
   servicesByCategory: {
     hair: services.filter((service) => service.category === 'hair').length,
     skin: services.filter((service) => service.category === 'skin').length,

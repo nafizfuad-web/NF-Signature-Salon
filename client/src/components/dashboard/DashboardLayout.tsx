@@ -32,6 +32,7 @@ const ADMIN_NAV: DashboardNavItem[] = [
   { label: 'Payments', to: '/admin/payments', icon: 'chart' },
   { label: 'Services', to: '/admin/services', icon: 'briefcase' },
   { label: 'Customers', to: '/admin/customers', icon: 'users' },
+  { label: 'Profile', to: '/admin/profile', icon: 'user' },
 ]
 
 export default function DashboardLayout({ variant }: DashboardLayoutProps) {

@@ -21,6 +21,7 @@ import AdminBookingsPage from '@/pages/dashboard/AdminBookingsPage'
 import AdminCustomersPage from '@/pages/dashboard/AdminCustomersPage'
 import AdminDashboardPage from '@/pages/dashboard/AdminDashboardPage'
 import AdminPaymentsPage from '@/pages/dashboard/AdminPaymentsPage'
+import AdminProfilePage from '@/pages/dashboard/AdminProfilePage'
 import AdminServicesPage from '@/pages/dashboard/AdminServicesPage'
 import CustomerAppointmentsPage from '@/pages/dashboard/CustomerAppointmentsPage'
 import CustomerDashboardPage from '@/pages/dashboard/CustomerDashboardPage'
@@ -64,6 +65,7 @@ export default function App() {
           <Route path="payments" element={<AdminPaymentsPage />} />
           <Route path="services" element={<AdminServicesPage />} />
           <Route path="customers" element={<AdminCustomersPage />} />
+          <Route path="profile" element={<AdminProfilePage />} />
           <Route path="*" element={<Navigate to="/admin" replace />} />
         </Route>
       </Routes>

@@ -15,8 +15,10 @@ import ServiceImage from '@/components/services/ServiceImage'
 import { useAuth } from '@/hooks/useAuth'
 import { useServices } from '@/hooks/useServices'
 import { useToast } from '@/hooks/useToast'
+import PaymentPanel from '@/components/payments/PaymentPanel'
 import { createAppointment } from '@/services/api/appointments'
 import { fetchAvailableSlots } from '@/services/api/availability'
+import { fetchAppointmentPayment } from '@/services/api/payments'
 import type { Appointment } from '@/types'
 import { cn } from '@/lib/cn'
 import { getErrorMessage } from '@/utils/errors'
@@ -68,6 +70,7 @@ export default function BookingPage() {
   const [submitting, setSubmitting] = useState(false)
   const [submitError, setSubmitError] = useState('')
   const [confirmation, setConfirmation] = useState<Appointment | null>(null)
+  const [paymentOpen, setPaymentOpen] = useState(false)
 
   const selectedService = useMemo(
     () => services?.find((service) => service.id === serviceId) ?? null,
@@ -196,6 +199,7 @@ export default function BookingPage() {
         notes: notes.trim() || undefined,
       })
       setConfirmation(appointment)
+      setPaymentOpen(false)
       toast.success('Appointment requested', 'The salon will confirm your appointment by email.')
     } catch (caught) {
       const message = getErrorMessage(caught, 'Your appointment could not be requested. Please try again.')
@@ -208,6 +212,7 @@ export default function BookingPage() {
 
   function resetBooking() {
     setConfirmation(null)
+    setPaymentOpen(false)
     setStep(1)
     setMaxReached(1)
     setServiceId('')
@@ -221,7 +226,21 @@ export default function BookingPage() {
     setSubmitError('')
   }
 
+  async function refreshConfirmationPayment() {
+    if (!confirmation) return
+    try {
+      const state = await fetchAppointmentPayment(confirmation.id)
+      setConfirmation(state.appointment)
+    } catch {
+      return
+    }
+  }
+
   if (confirmation) {
+    const canPayConfirmation =
+      confirmation.status === 'confirmed' &&
+      (confirmation.paymentStatus ?? 'unpaid') === 'unpaid'
+
     return (
       <>
         <PageHeader
@@ -235,7 +254,15 @@ export default function BookingPage() {
             <BookingConfirmation
               appointment={confirmation}
               onBookAnother={resetBooking}
+              onPay={canPayConfirmation ? () => setPaymentOpen(true) : undefined}
             />
+            {paymentOpen && (
+              <PaymentPanel
+                appointment={confirmation}
+                onClose={() => setPaymentOpen(false)}
+                onChanged={refreshConfirmationPayment}
+              />
+            )}
           </div>
         </section>
       </>
@@ -372,16 +399,6 @@ export default function BookingPage() {
                         <Icon name="calendar" size={18} />
                       </button>
                     </div>
-                    <p className="booking-date-display" aria-live="polite">
-                      {date
-                        ? <>Selected date: <strong>{formatDate(date, {
-                          weekday: undefined,
-                          month: 'short',
-                          day: 'numeric',
-                          year: 'numeric',
-                        })}</strong></>
-                        : 'Select a date to continue.'}
-                    </p>
                   </div>
                   <Button
                     variant="outline"
@@ -392,6 +409,17 @@ export default function BookingPage() {
                     Check availability
                   </Button>
                 </div>
+
+                <p className="booking-date-display" aria-live="polite">
+                  {date
+                    ? <>Selected date: <strong>{formatDate(date, {
+                      weekday: undefined,
+                      month: 'short',
+                      day: 'numeric',
+                      year: 'numeric',
+                    })}</strong></>
+                    : 'Select a date to continue.'}
+                </p>
 
                 {slotsError && (
                   <p className="form-error" role="alert">

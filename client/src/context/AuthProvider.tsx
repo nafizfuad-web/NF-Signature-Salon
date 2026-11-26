@@ -237,6 +237,7 @@ export default function AuthProvider({ children }: AuthProviderProps) {
       logout,
       restoreSession,
       updateUser,
+      applySession,
     }),
     [
       user,
@@ -249,6 +250,7 @@ export default function AuthProvider({ children }: AuthProviderProps) {
       logout,
       restoreSession,
       updateUser,
+      applySession,
     ]
   )
 

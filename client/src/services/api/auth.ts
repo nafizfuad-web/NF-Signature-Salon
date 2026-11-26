@@ -138,3 +138,19 @@ export async function resendVerification(): Promise<void> {
 export async function resendVerificationEmail(email: string): Promise<void> {
   await apiPost<void>('/auth/resend-verification-email', { email }, { auth: false })
 }
+
+export async function changePassword(
+  currentPassword: string,
+  newPassword: string
+): Promise<AuthResponse> {
+  const payload = await apiPost<unknown>('/auth/change-password', {
+    currentPassword,
+    newPassword,
+  })
+  const { token, user: rawUser } = extractAuthPayload(payload)
+  const user = parseAuthUser(rawUser)
+  if (!token || !user) {
+    throw unexpectedResponse('The server returned an unexpected password response.')
+  }
+  return { token, user }
+}

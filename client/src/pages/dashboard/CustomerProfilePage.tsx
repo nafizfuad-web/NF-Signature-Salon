@@ -19,7 +19,7 @@ import { getErrorMessage } from '@/utils/errors'
 
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
-function CustomerProfileContent() {
+export function CustomerProfileContent() {
   const { user, updateUser } = useAuth()
   const { toast } = useToast()
 

@@ -95,10 +95,10 @@ export default function Navbar() {
 
   if (isAdmin) {
     dashboardLinks.push({
-      label: 'Admin Dashboard',
+      label: 'Admin Panel',
       href: '/admin',
       icon: 'shield',
-      description: 'Manage bookings and the salon',
+      description: 'Salon administration workspace',
     })
   }
 

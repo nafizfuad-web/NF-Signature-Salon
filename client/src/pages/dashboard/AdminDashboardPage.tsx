@@ -23,6 +23,18 @@ import type {
   AppointmentStatus,
 } from '@/types'
 import { getErrorMessage } from '@/utils/errors'
+import { formatShortDate } from '@/utils/format'
+
+const PAYMENT_STATUS_LABELS: Record<string, string> = {
+  pending: 'Pending',
+  processing: 'Processing',
+  succeeded: 'Paid',
+  cash_pending: 'Cash pending',
+  cash_received: 'Cash received',
+  failed: 'Failed',
+  cancelled: 'Cancelled',
+  refunded: 'Refunded',
+}
 
 function AdminDashboardLoading() {
   return (
@@ -128,31 +140,15 @@ function AdminDashboardContent() {
       ) : data ? (
         <>
           <div className="stats-grid">
-            <StatCard
-              icon="calendar"
-              label="Today's bookings"
-              value={data.stats.todayBookings}
-              hint="Scheduled for today"
-              accent
-            />
-            <StatCard
-              icon="clock"
-              label="Pending requests"
-              value={data.stats.pendingBookings}
-              hint="Awaiting confirmation"
-            />
-            <StatCard
-              icon="briefcase"
-              label="Active services"
-              value={data.stats.activeServices}
-              hint="On the public menu"
-            />
-            <StatCard
-              icon="users"
-              label="Registered customers"
-              value={data.stats.totalCustomers}
-              hint="Accounts on file"
-            />
+            <StatCard icon="users" label="Total customers" value={data.stats.totalCustomers} hint="Registered accounts" />
+            <StatCard icon="briefcase" label="Active services" value={data.stats.activeServices} hint="On the public menu" />
+            <StatCard icon="calendar" label="Appointment requests" value={data.stats.totalAppointments} hint="All bookings" />
+            <StatCard icon="clock" label="Pending" value={data.stats.pendingBookings} hint="Awaiting confirmation" />
+            <StatCard icon="check" label="Confirmed" value={data.stats.confirmedBookings} hint="Approved bookings" />
+            <StatCard icon="grid" label="Completed" value={data.stats.completedBookings} hint="Finished visits" />
+            <StatCard icon="x" label="Cancelled" value={data.stats.cancelledBookings} hint="Cancelled bookings" />
+            <StatCard icon="chart" label="Successful payments" value={data.stats.successfulPayments} hint="Settled transactions" />
+            <StatCard icon="sparkles" label="Today's bookings" value={data.stats.todayBookings} hint="Scheduled today" accent />
           </div>
 
           <div className="dashboard-grid dashboard-grid-admin">
@@ -204,6 +200,39 @@ function AdminDashboardContent() {
             </DashboardCard>
           </div>
 
+          <DashboardCard
+            title="Recent payments"
+            description="The latest payment records across the salon."
+            action={<Link to="/admin/payments" className="dashboard-card-link">View all</Link>}
+          >
+            {data.recentTransactions.length === 0 ? (
+              <p className="table-muted">No payment records yet.</p>
+            ) : (
+              <div className="payment-history-list">
+                {data.recentTransactions.slice(0, 5).map((transaction) => (
+                  <div key={transaction.id} className="payment-history-row">
+                    <div>
+                      <strong>{transaction.serviceTitle}</strong>
+                      <span>
+                        {transaction.customerName ?? transaction.customerEmail ?? 'Customer'} · BDT {transaction.amount}
+                      </span>
+                      <small>{transaction.createdAt ? formatShortDate(transaction.createdAt) : '—'}</small>
+                    </div>
+                    <div>
+                      <strong>{transaction.paymentMethod}</strong>
+                      <span>{transaction.environment}{transaction.simulated ? ' · simulated' : ''}</span>
+                    </div>
+                    <div className="payment-history-actions">
+                      <span className={`payment-status payment-status-${transaction.paymentStatus}`}>
+                        {PAYMENT_STATUS_LABELS[transaction.paymentStatus] ?? transaction.paymentStatus}
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </DashboardCard>
+
           <div className="dashboard-quick-links">
             <Link to="/admin/bookings" className="quick-action">
               <span className="quick-action-icon"><Icon name="calendar" size={18} /></span>
@@ -231,7 +260,13 @@ function AdminDashboardContent() {
             </Link>
           </div>
         </>
-      ) : null}
+      ) : (
+        <ErrorState
+          title="No dashboard data"
+          message="The admin dashboard did not return any data. Please retry or check the API connection."
+          onRetry={refetch}
+        />
+      )}
     </>
   )
 }

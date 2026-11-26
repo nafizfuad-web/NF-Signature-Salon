@@ -10,12 +10,29 @@ import type { Appointment } from '@/types'
 interface BookingConfirmationProps {
   appointment: Appointment
   onBookAnother: () => void
+  onPay?: () => void
 }
 
 export default function BookingConfirmation({
   appointment,
   onBookAnother,
+  onPay,
 }: BookingConfirmationProps) {
+  const statusLabel =
+    appointment.status === 'confirmed'
+      ? 'Confirmed'
+      : appointment.status === 'completed'
+        ? 'Completed'
+        : appointment.status === 'cancelled'
+          ? 'Cancelled'
+          : 'Pending confirmation'
+  const paymentLabel =
+    appointment.paymentStatus === 'paid'
+      ? 'Paid'
+      : appointment.paymentStatus === 'pending'
+        ? 'Payment pending'
+        : null
+
   return (
     <div className="booking-confirmation" role="status" aria-live="polite">
       <span className="booking-confirmation-icon" aria-hidden="true">
@@ -53,12 +70,23 @@ export default function BookingConfirmation({
         )}
         <div>
           <dt>Status</dt>
-          <dd className="booking-status">Pending confirmation</dd>
+          <dd className="booking-status">{statusLabel}</dd>
         </div>
+        {paymentLabel && (
+          <div>
+            <dt>Payment</dt>
+            <dd>{paymentLabel}</dd>
+          </div>
+        )}
       </dl>
 
       <div className="booking-confirmation-actions">
-        <ButtonLink to="/dashboard" variant="primary" rightIcon={<Icon name="arrow-right" size={16} />}>
+        {onPay && (
+          <Button variant="primary" onClick={onPay} rightIcon={<Icon name="arrow-right" size={16} />}>
+            Pay now
+          </Button>
+        )}
+        <ButtonLink to="/dashboard" variant={onPay ? 'outline' : 'primary'} rightIcon={<Icon name="arrow-right" size={16} />}>
           View my dashboard
         </ButtonLink>
         <Button variant="outline" onClick={onBookAnother}>

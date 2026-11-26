@@ -12,6 +12,7 @@ export interface ServiceItem {
   title: string
   description: string
   price: string
+  priceAmount?: number
   duration?: string
   category: ServiceCategory
   image?: string
@@ -19,6 +20,9 @@ export interface ServiceItem {
   longDescription?: string
   includes?: string[]
   goodToKnow?: string[]
+  active?: boolean
+  createdAt?: string
+  updatedAt?: string
 }
 
 export interface ServiceQuery {
@@ -151,15 +155,21 @@ export interface CustomerDashboardData {
 }
 
 export interface AdminStats {
-  todayBookings: number
-  pendingBookings: number
-  activeServices: number
   totalCustomers: number
+  activeServices: number
+  totalAppointments: number
+  pendingBookings: number
+  confirmedBookings: number
+  cancelledBookings: number
+  completedBookings: number
+  todayBookings: number
+  successfulPayments: number
 }
 
 export interface AdminDashboardData {
   stats: AdminStats
   recentBookings: Appointment[]
+  recentTransactions: PaymentTransaction[]
   servicesByCategory: Record<ServiceCategory, number>
 }
 
@@ -168,9 +178,36 @@ export interface CustomerRecord {
   name: string
   email: string
   phone?: string
+  avatarUrl?: string
+  role?: UserRole
+  isBlocked?: boolean
+  emailVerified?: boolean
   visits: number
-  lastVisit?: string
+  lastVisit?: string | null
+  lastLoginAt?: string
   joinedAt?: string
+  createdAt?: string
+}
+
+export interface AdminCustomerDetail {
+  customer: CustomerRecord
+  appointments: Appointment[]
+  transactions: PaymentTransaction[]
+}
+
+export interface AdminServicePayload {
+  title: string
+  description: string
+  longDescription?: string
+  price?: string
+  priceAmount: number
+  durationMinutes: number
+  category: ServiceCategory
+  image?: string
+  featured?: boolean
+  active?: boolean
+  includes?: string[]
+  goodToKnow?: string[]
 }
 
 export interface BookingStatusUpdate {

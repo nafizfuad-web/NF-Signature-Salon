@@ -65,7 +65,7 @@ export default function BookingSummary({
         </p>
       )}
 
-      <p className="booking-summary-note">
+      <p className="booking-summary-note booking-summary-payment-note">
         <Icon name="shield" size={14} />
         Payment is a simulated TEST demo after confirmation. No real money is charged.
       </p>
