@@ -8,10 +8,13 @@ import type { PaymentTransaction } from '@/types'
 import { formatShortDate } from '@/utils/format'
 
 const METHOD_LABELS: Record<string, string> = {
+  stripe: 'Card via Stripe',
+  bkash: 'bKash',
+  nagad: 'Nagad',
   stripe_demo: 'Stripe Demo',
   bkash_demo: 'bKash Demo',
   nagad_demo: 'Nagad Demo',
-  pay_at_salon: 'Pay at Salon Demo',
+  pay_at_salon: 'Pay at Salon',
 }
 
 const STATUS_LABELS: Record<string, string> = {
@@ -22,6 +25,7 @@ const STATUS_LABELS: Record<string, string> = {
   cash_received: 'Cash received',
   failed: 'Failed',
   cancelled: 'Cancelled',
+  refunded: 'Refunded',
 }
 
 interface PaymentHistoryProps {
@@ -57,7 +61,7 @@ export default function PaymentHistory({ refreshKey = 0 }: PaymentHistoryProps) 
       <EmptyState
         icon="check"
         title="No TEST payments yet"
-        description="Simulated payments for your confirmed appointments will appear here."
+        description="TEST payments for your confirmed appointments will appear here."
         compact
       />
     )
@@ -75,7 +79,7 @@ export default function PaymentHistory({ refreshKey = 0 }: PaymentHistoryProps) 
           </div>
           <div>
             <strong>{METHOD_LABELS[transaction.paymentMethod] ?? transaction.paymentMethod}</strong>
-            <span>BDT {transaction.amount} · TEST</span>
+            <span>BDT {transaction.amount} · {transaction.environment}</span>
           </div>
           <span className={`payment-status payment-status-${transaction.paymentStatus}`}>
             <Icon name="shield" size={13} />

@@ -1,357 +1,593 @@
+import {
+  useEffect,
+  useRef,
+  useState,
+  type FocusEvent as ReactFocusEvent,
+  type PointerEvent as ReactPointerEvent,
+} from 'react'
 import { Link, useLocation } from 'react-router-dom'
-import { useState, useEffect } from 'react'
-import { NAV_LINKS } from '@/utils/constants'
-import Icon from '@/components/common/Icon'
+import Icon, { type IconName } from '@/components/common/Icon'
 import { useAuth } from '@/hooks/useAuth'
 import { resolveAssetUrl } from '@/services/config'
+import type { AuthUser } from '@/types'
 import { getInitials } from '@/utils/format'
 
+type DropdownKey = 'more' | 'dashboard'
+
+interface DropdownLink {
+  label: string
+  href: string
+  icon: IconName
+  description: string
+}
+
+const PRIMARY_LINKS = [
+  { label: 'Home', href: '/' },
+  { label: 'Services', href: '/services' },
+] as const
+
+const MORE_LINKS: DropdownLink[] = [
+  {
+    label: 'Gallery',
+    href: '/gallery',
+    icon: 'grid',
+    description: 'A look at our signature work',
+  },
+  {
+    label: 'About',
+    href: '/about',
+    icon: 'sparkles',
+    description: 'The story behind the salon',
+  },
+  {
+    label: 'Contact',
+    href: '/contact',
+    icon: 'mail',
+    description: 'Visit us or get in touch',
+  },
+]
+
+function NavAvatar({ user }: { user: AuthUser }) {
+  return (
+    <span className="nf-avatar" aria-hidden="true">
+      {user.avatarUrl ? (
+        <img src={resolveAssetUrl(user.avatarUrl)} alt="" />
+      ) : (
+        getInitials(user.name)
+      )}
+    </span>
+  )
+}
+
 export default function Navbar() {
+  const location = useLocation()
   const [isMenuOpen, setIsMenuOpen] = useState(false)
   const [isScrolled, setIsScrolled] = useState(false)
-  const location = useLocation()
+  const [openDropdown, setOpenDropdown] = useState<DropdownKey | null>(null)
+  const [openMobileSection, setOpenMobileSection] = useState<DropdownKey | null>(null)
+  const [navigationPath, setNavigationPath] = useState<string>(location.pathname)
   const { user, isLoading: authLoading } = useAuth()
-  const dashboardPath = user?.role === 'admin' ? '/admin' : '/dashboard'
 
-  // Scroll detection for background (synchronizes with an external system)
-  useEffect(() => {
-    const handleScroll = () => setIsScrolled(window.scrollY > 20)
-    window.addEventListener('scroll', handleScroll, { passive: true })
-    return () => window.removeEventListener('scroll', handleScroll)
-  }, [])
+  const navRef = useRef<HTMLElement | null>(null)
+  const menuToggleRef = useRef<HTMLButtonElement | null>(null)
+  const moreButtonRef = useRef<HTMLButtonElement | null>(null)
+  const dashboardButtonRef = useRef<HTMLButtonElement | null>(null)
+
+  const isAdmin = user?.role === 'admin'
+  const dashboardPath = isAdmin ? '/admin' : '/dashboard'
+  const firstName = user?.name.trim().split(/\s+/)[0] ?? ''
 
   const isActive = (href: string) =>
     href === '/' ? location.pathname === '/' : location.pathname.startsWith(href)
 
+  const isMoreActive = MORE_LINKS.some((item) => isActive(item.href))
+  const isDashboardActive =
+    location.pathname.startsWith('/dashboard') || location.pathname.startsWith('/admin')
+
+  const customerDashboardLink: DropdownLink = {
+    label: 'Customer Dashboard',
+    href: '/dashboard',
+    icon: user ? 'user' : 'lock',
+    description: user ? 'Appointments, profile and visits' : 'Sign in to view your visits',
+  }
+
+  const dashboardLinks: DropdownLink[] = [customerDashboardLink]
+
+  if (isAdmin) {
+    dashboardLinks.push({
+      label: 'Admin Dashboard',
+      href: '/admin',
+      icon: 'shield',
+      description: 'Manage bookings and the salon',
+    })
+  }
+
+  // Close every navigation layer when the route changes without an effect.
+  if (navigationPath !== location.pathname) {
+    setNavigationPath(location.pathname)
+    setIsMenuOpen(false)
+    setOpenDropdown(null)
+    setOpenMobileSection(null)
+  }
+
+  // Scroll detection for the elevated header treatment.
+  useEffect(() => {
+    const handleScroll = () => setIsScrolled(window.scrollY > 20)
+    handleScroll()
+    window.addEventListener('scroll', handleScroll, { passive: true })
+    return () => window.removeEventListener('scroll', handleScroll)
+  }, [])
+
+  // Close the desktop dropdown when clicking anywhere outside the navigation.
+  useEffect(() => {
+    if (!openDropdown) return
+
+    const handlePointerDown = (event: PointerEvent) => {
+      if (!navRef.current?.contains(event.target as Node)) {
+        setOpenDropdown(null)
+      }
+    }
+
+    document.addEventListener('pointerdown', handlePointerDown)
+    return () => document.removeEventListener('pointerdown', handlePointerDown)
+  }, [openDropdown])
+
+  // Escape closes the active layer and returns focus to its trigger.
+  useEffect(() => {
+    if (!openDropdown && !isMenuOpen) return
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape') return
+
+      if (openDropdown) {
+        const trigger =
+          openDropdown === 'more' ? moreButtonRef.current : dashboardButtonRef.current
+        setOpenDropdown(null)
+        trigger?.focus()
+      }
+
+      if (isMenuOpen) {
+        setIsMenuOpen(false)
+        setOpenMobileSection(null)
+        menuToggleRef.current?.focus()
+      }
+    }
+
+    document.addEventListener('keydown', handleKeyDown)
+    return () => document.removeEventListener('keydown', handleKeyDown)
+  }, [openDropdown, isMenuOpen])
+
+  // Reset the correct layer when crossing the desktop / mobile breakpoint.
+  useEffect(() => {
+    const query = window.matchMedia('(min-width: 1025px)')
+    const handleChange = (event: MediaQueryListEvent) => {
+      if (event.matches) {
+        setIsMenuOpen(false)
+        setOpenMobileSection(null)
+      } else {
+        setOpenDropdown(null)
+      }
+    }
+
+    query.addEventListener('change', handleChange)
+    return () => query.removeEventListener('change', handleChange)
+  }, [])
+
+  // Prevent the page behind the mobile menu from scrolling.
+  useEffect(() => {
+    if (!isMenuOpen) return
+
+    const previousOverflow = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    return () => {
+      document.body.style.overflow = previousOverflow
+    }
+  }, [isMenuOpen])
+
+  const toggleDropdown = (key: DropdownKey) => {
+    setOpenDropdown((current) => (current === key ? null : key))
+  }
+
+  const handleDropdownPointerEnter = (
+    key: DropdownKey,
+    event: ReactPointerEvent<HTMLLIElement>,
+  ) => {
+    if (event.pointerType === 'mouse') {
+      setOpenDropdown(key)
+    }
+  }
+
+  const handleDropdownPointerLeave = (
+    key: DropdownKey,
+    event: ReactPointerEvent<HTMLLIElement>,
+  ) => {
+    if (event.pointerType === 'mouse') {
+      setOpenDropdown((current) => (current === key ? null : current))
+    }
+  }
+
+  const handleDropdownBlur = (key: DropdownKey, event: ReactFocusEvent<HTMLLIElement>) => {
+    if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
+      setOpenDropdown((current) => (current === key ? null : current))
+    }
+  }
+
+  const toggleMobileSection = (key: DropdownKey) => {
+    setOpenMobileSection((current) => (current === key ? null : key))
+  }
+
+  const closeNavigation = () => {
+    setIsMenuOpen(false)
+    setOpenDropdown(null)
+    setOpenMobileSection(null)
+  }
+
   return (
     <header
-      style={{
-        position: 'fixed',
-        top: 0,
-        left: 0,
-        right: 0,
-        zIndex: 100,
-        transition: 'background-color 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease',
-        backgroundColor: isScrolled || isMenuOpen ? 'rgba(10, 10, 10, 0.98)' : 'transparent',
-        borderBottom: isScrolled || isMenuOpen ? '1px solid rgba(201, 168, 76, 0.2)' : '1px solid transparent',
-        boxShadow: isScrolled || isMenuOpen ? '0 4px 24px rgba(0,0,0,0.4)' : 'none',
-        backdropFilter: isScrolled || isMenuOpen ? 'blur(12px)' : 'none',
-      }}
+      className={`nf-header${isScrolled ? ' is-scrolled' : ''}${
+        isMenuOpen ? ' is-menu-open' : ''
+      }`}
     >
       <div className="section-container">
-        <nav
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            height: '72px',
-          }}
-        >
+        <nav className="nf-nav" ref={navRef} aria-label="Primary navigation">
           {/* Logo */}
           <Link
             to="/"
-            style={{ display: 'flex', flexDirection: 'column', lineHeight: 1 }}
+            className="nf-brand"
             aria-label="NF Signature Salon — Home"
+            onClick={closeNavigation}
           >
-            <span
-              style={{
-                fontFamily: 'var(--font-heading)',
-                fontSize: '1.4rem',
-                fontWeight: 700,
-                letterSpacing: '0.08em',
-                color: 'var(--color-gold)',
-              }}
-            >
-              NF SIGNATURE
-            </span>
-            <span
-              style={{
-                fontSize: '0.65rem',
-                letterSpacing: '0.3em',
-                color: 'var(--color-white-muted)',
-                textTransform: 'uppercase',
-                marginTop: '2px',
-              }}
-            >
-              SALON
-            </span>
+            <span className="nf-brand-name">NF SIGNATURE</span>
+            <span className="nf-brand-sub">SALON</span>
           </Link>
 
-          {/* Desktop Nav */}
-          <ul
-            style={{
-              display: 'flex',
-              gap: 'clamp(1rem, 2vw, 2.5rem)',
-              listStyle: 'none',
-              alignItems: 'center',
-            }}
-            className="hidden-mobile"
-          >
-            {NAV_LINKS.map((link) => (
+          {/* Desktop links */}
+          <ul className="nf-links">
+            {PRIMARY_LINKS.map((link) => (
               <li key={link.href}>
                 <Link
                   to={link.href}
-                  style={{
-                    fontSize: '0.85rem',
-                    fontWeight: 500,
-                    letterSpacing: '0.12em',
-                    textTransform: 'uppercase',
-                    color: isActive(link.href)
-                      ? 'var(--color-gold)'
-                      : 'var(--color-white-muted)',
-                    borderBottom: isActive(link.href)
-                      ? '1px solid var(--color-gold)'
-                      : '1px solid transparent',
-                    paddingBottom: '2px',
-                    transition: 'color var(--transition-fast), border-color var(--transition-fast)',
-                  }}
-                  onMouseEnter={(e) => {
-                    if (!isActive(link.href)) {
-                      e.currentTarget.style.color = 'var(--color-white)'
-                    }
-                  }}
-                  onMouseLeave={(e) => {
-                    if (!isActive(link.href)) {
-                      e.currentTarget.style.color = 'var(--color-white-muted)'
-                    }
-                  }}
+                  className={`nf-link${isActive(link.href) ? ' is-active' : ''}`}
+                  aria-current={isActive(link.href) ? 'page' : undefined}
                 >
                   {link.label}
                 </Link>
               </li>
             ))}
+
+            <li
+              className={`nf-dropdown${openDropdown === 'more' ? ' is-open' : ''}`}
+              onPointerEnter={(event) => handleDropdownPointerEnter('more', event)}
+              onPointerLeave={(event) => handleDropdownPointerLeave('more', event)}
+              onBlur={(event) => handleDropdownBlur('more', event)}
+            >
+              <button
+                type="button"
+                ref={moreButtonRef}
+                className={`nf-link nf-dropdown-trigger${isMoreActive ? ' is-active' : ''}`}
+                aria-haspopup="true"
+                aria-expanded={openDropdown === 'more'}
+                aria-controls="nf-more-panel"
+                onClick={() => toggleDropdown('more')}
+              >
+                More
+                <Icon name="chevron-down" size={13} className="nf-chevron" />
+              </button>
+
+              <div
+                id="nf-more-panel"
+                className="nf-dropdown-panel"
+                aria-hidden={openDropdown !== 'more'}
+              >
+                <div className="nf-dropdown-card">
+                  {MORE_LINKS.map((item) => (
+                    <Link
+                      key={item.href}
+                      to={item.href}
+                      className={`nf-dropdown-item${isActive(item.href) ? ' is-active' : ''}`}
+                      aria-current={isActive(item.href) ? 'page' : undefined}
+                      onClick={() => setOpenDropdown(null)}
+                    >
+                      <span className="nf-dropdown-icon">
+                        <Icon name={item.icon} size={16} />
+                      </span>
+                      <span className="nf-dropdown-copy">
+                        <strong>{item.label}</strong>
+                        <small>{item.description}</small>
+                      </span>
+                      <Icon name="chevron-right" size={14} className="nf-dropdown-arrow" />
+                    </Link>
+                  ))}
+                </div>
+              </div>
+            </li>
+
+            <li
+              className={`nf-dropdown${openDropdown === 'dashboard' ? ' is-open' : ''}`}
+              onPointerEnter={(event) => handleDropdownPointerEnter('dashboard', event)}
+              onPointerLeave={(event) => handleDropdownPointerLeave('dashboard', event)}
+              onBlur={(event) => handleDropdownBlur('dashboard', event)}
+            >
+              <button
+                type="button"
+                ref={dashboardButtonRef}
+                className={`nf-link nf-dropdown-trigger${
+                  isDashboardActive ? ' is-active' : ''
+                }`}
+                aria-haspopup="true"
+                aria-expanded={openDropdown === 'dashboard'}
+                aria-controls="nf-dashboard-panel"
+                onClick={() => toggleDropdown('dashboard')}
+              >
+                Dashboard
+                <Icon name="chevron-down" size={13} className="nf-chevron" />
+              </button>
+
+              <div
+                id="nf-dashboard-panel"
+                className="nf-dropdown-panel"
+                aria-hidden={openDropdown !== 'dashboard'}
+              >
+                <div className="nf-dropdown-card nf-dropdown-card-dashboard">
+                  {dashboardLinks.map((item, index) => (
+                    <div key={item.href}>
+                      {isAdmin && index === 1 && <div className="nf-dropdown-separator" />}
+                      <Link
+                        to={item.href}
+                        className={`nf-dropdown-item${isActive(item.href) ? ' is-active' : ''}`}
+                        aria-current={isActive(item.href) ? 'page' : undefined}
+                        onClick={() => setOpenDropdown(null)}
+                      >
+                        <span
+                          className={`nf-dropdown-icon${
+                            item.href === '/admin' ? ' nf-dropdown-icon-admin' : ''
+                          }`}
+                        >
+                          <Icon name={item.icon} size={16} />
+                        </span>
+                        <span className="nf-dropdown-copy">
+                          <strong>{item.label}</strong>
+                          <small>{item.description}</small>
+                        </span>
+                        <Icon name="chevron-right" size={14} className="nf-dropdown-arrow" />
+                      </Link>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </li>
           </ul>
 
-          {/* Account + Book Now CTA (desktop) */}
-          <div className="hidden-mobile navbar-actions">
-            {!authLoading && (
-              user ? (
-                <Link to={dashboardPath} className="navbar-account" aria-label="Open my dashboard">
-                  <span className="navbar-avatar" aria-hidden="true">
-                    {user.avatarUrl ? (
-                      <img
-                        src={resolveAssetUrl(user.avatarUrl)}
-                        alt=""
-                        style={{
-                          width: '100%',
-                          height: '100%',
-                          objectFit: 'cover',
-                          borderRadius: '50%',
-                        }}
-                      />
-                    ) : (
-                      getInitials(user.name)
-                    )}
-                  </span>
-                  <span className="navbar-account-label">Dashboard</span>
-                </Link>
-              ) : (
-                <Link to="/signin" className="navbar-signin" aria-label="Sign in">
-                  <Icon name="user" size={16} />
-                  <span className="navbar-signin-label">Sign In</span>
-                </Link>
-              )
+          {/* Desktop account + CTA */}
+          <div className="nf-actions">
+            {authLoading ? (
+              <span className="nf-auth-loading" aria-label="Loading your account">
+                <span className="nf-auth-spinner" aria-hidden="true" />
+              </span>
+            ) : user ? (
+              <Link
+                to={dashboardPath}
+                className="nf-account"
+                aria-label={`Open ${isAdmin ? 'admin' : 'customer'} dashboard`}
+                onClick={() => setOpenDropdown(null)}
+              >
+                <NavAvatar user={user} />
+                <span className="nf-account-copy">
+                  <small>{isAdmin ? 'Administrator' : 'My account'}</small>
+                  <strong>{firstName}</strong>
+                </span>
+              </Link>
+            ) : (
+              <Link
+                to="/signin"
+                className="nf-signin"
+                onClick={() => setOpenDropdown(null)}
+              >
+                <Icon name="user" size={16} />
+                <span>Sign In</span>
+              </Link>
             )}
 
             <Link
               to="/booking"
-              style={{
-                padding: '0.5rem 1.25rem',
-                border: '1px solid var(--color-gold)',
-                color: 'var(--color-gold)',
-                fontSize: '0.8rem',
-                fontWeight: 600,
-                letterSpacing: '0.12em',
-                textTransform: 'uppercase',
-                borderRadius: 'var(--radius-sm)',
-                transition: 'background-color var(--transition-fast), color var(--transition-fast)',
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.backgroundColor = 'var(--color-gold)'
-                e.currentTarget.style.color = 'var(--color-black)'
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.backgroundColor = 'transparent'
-                e.currentTarget.style.color = 'var(--color-gold)'
-              }}
+              className="nf-book"
+              onClick={() => setOpenDropdown(null)}
             >
-              Book Now
+              <span>Book Now</span>
+              <Icon name="arrow-right" size={14} />
             </Link>
           </div>
 
-          {/* Hamburger (mobile) */}
-          <button
-            onClick={() => setIsMenuOpen((prev) => !prev)}
-            aria-label={isMenuOpen ? 'Close menu' : 'Open menu'}
-            aria-expanded={isMenuOpen}
-            aria-controls="mobile-menu"
-            className="show-mobile"
-            style={{
-              background: 'none',
-              border: 'none',
-              cursor: 'pointer',
-              padding: '0.5rem',
-              color: 'var(--color-white)',
-              display: 'flex',
-              flexDirection: 'column',
-              gap: '5px',
-            }}
-          >
-            <span
-              style={{
-                display: 'block',
-                width: '22px',
-                height: '2px',
-                backgroundColor: 'var(--color-gold)',
-                transition: 'transform 0.25s ease, opacity 0.25s ease',
-                transform: isMenuOpen ? 'translateY(7px) rotate(45deg)' : 'none',
-              }}
-            />
-            <span
-              style={{
-                display: 'block',
-                width: '22px',
-                height: '2px',
-                backgroundColor: 'var(--color-gold)',
-                transition: 'opacity 0.25s ease',
-                opacity: isMenuOpen ? 0 : 1,
-              }}
-            />
-            <span
-              style={{
-                display: 'block',
-                width: '22px',
-                height: '2px',
-                backgroundColor: 'var(--color-gold)',
-                transition: 'transform 0.25s ease',
-                transform: isMenuOpen ? 'translateY(-7px) rotate(-45deg)' : 'none',
-              }}
-            />
-          </button>
-        </nav>
-
-        {/* Mobile Menu */}
-        <div
-          id="mobile-menu"
-          className="show-mobile"
-          style={{
-            width: '100%',
-            overflow: 'hidden',
-            maxHeight: isMenuOpen ? '560px' : '0',
-            transition: 'max-height 0.35s ease',
-            borderTop: isMenuOpen ? '1px solid var(--color-border)' : 'none',
-          }}
-        >
-          <ul
-            style={{
-              listStyle: 'none',
-              width: '100%',
-              padding: '1rem 0',
-              display: 'flex',
-              flexDirection: 'column',
-              gap: '0',
-            }}
-          >
-            {NAV_LINKS.map((link) => (
-              <li key={link.href}>
-                <Link
-                  to={link.href}
-                  onClick={() => setIsMenuOpen(false)}
-                  style={{
-                    display: 'block',
-                    padding: '0.85rem 0',
-                    fontSize: '0.9rem',
-                    fontWeight: 500,
-                    letterSpacing: '0.12em',
-                    textTransform: 'uppercase',
-                    color: isActive(link.href) ? 'var(--color-gold)' : 'var(--color-white-muted)',
-                    borderBottom: '1px solid var(--color-border)',
-                    transition: 'color var(--transition-fast)',
-                  }}
-                >
-                  {link.label}
-                </Link>
-              </li>
-            ))}
-            {!authLoading && (
-              <li style={{ paddingTop: '1rem' }}>
-                {user ? (
-                  <Link
-                    to={dashboardPath}
-                    onClick={() => setIsMenuOpen(false)}
-                    style={{
-                      display: 'block',
-                      padding: '0.85rem 0',
-                      fontSize: '0.9rem',
-                      fontWeight: 600,
-                      letterSpacing: '0.12em',
-                      textTransform: 'uppercase',
-                      color: 'var(--color-gold)',
-                      borderBottom: '1px solid var(--color-border)',
-                    }}
-                  >
-                    My Dashboard
-                  </Link>
-                ) : (
-                  <>
-                    <Link
-                      to="/signin"
-                      onClick={() => setIsMenuOpen(false)}
-                      style={{
-                        display: 'block',
-                        padding: '0.85rem 0',
-                        fontSize: '0.9rem',
-                        fontWeight: 500,
-                        letterSpacing: '0.12em',
-                        textTransform: 'uppercase',
-                        color: 'var(--color-white-muted)',
-                        borderBottom: '1px solid var(--color-border)',
-                      }}
-                    >
-                      Sign In
-                    </Link>
-                    <Link
-                      to="/signup"
-                      onClick={() => setIsMenuOpen(false)}
-                      style={{
-                        display: 'block',
-                        padding: '0.85rem 0',
-                        fontSize: '0.9rem',
-                        fontWeight: 500,
-                        letterSpacing: '0.12em',
-                        textTransform: 'uppercase',
-                        color: 'var(--color-white-muted)',
-                        borderBottom: '1px solid var(--color-border)',
-                      }}
-                    >
-                      Create Account
-                    </Link>
-                  </>
-                )}
-              </li>
+          {/* Mobile actions */}
+          <div className="nf-mobile-actions">
+            {authLoading ? (
+              <span
+                className="nf-auth-loading nf-auth-loading-mobile"
+                aria-label="Loading your account"
+              >
+                <span className="nf-auth-spinner" aria-hidden="true" />
+              </span>
+            ) : user ? (
+              <Link
+                to={dashboardPath}
+                className="nf-mobile-account"
+                aria-label={`Open ${isAdmin ? 'admin' : 'customer'} dashboard`}
+                onClick={closeNavigation}
+              >
+                <NavAvatar user={user} />
+              </Link>
+            ) : (
+              <Link
+                to="/signin"
+                className="nf-mobile-signin"
+                aria-label="Sign in"
+                onClick={closeNavigation}
+              >
+                <Icon name="user" size={17} />
+                <span className="nf-mobile-signin-label">Sign In</span>
+              </Link>
             )}
 
-            <li style={{ paddingTop: '1rem' }}>
-              <Link
-                to="/booking"
-                onClick={() => setIsMenuOpen(false)}
-                style={{
-                  display: 'block',
-                  textAlign: 'center',
-                  padding: '0.75rem',
-                  backgroundColor: 'var(--color-gold)',
-                  color: 'var(--color-black)',
-                  fontSize: '0.85rem',
-                  fontWeight: 700,
-                  letterSpacing: '0.12em',
-                  textTransform: 'uppercase',
-                  borderRadius: 'var(--radius-sm)',
-                }}
+            <Link to="/booking" className="nf-mobile-book" onClick={closeNavigation}>
+              Book Now
+            </Link>
+
+            <button
+              type="button"
+              ref={menuToggleRef}
+              className={`nf-toggle${isMenuOpen ? ' is-open' : ''}`}
+              onClick={() => {
+                setIsMenuOpen((current) => !current)
+                setOpenMobileSection(null)
+              }}
+              aria-label={isMenuOpen ? 'Close menu' : 'Open menu'}
+              aria-expanded={isMenuOpen}
+              aria-controls="nf-mobile-menu"
+            >
+              <span />
+              <span />
+              <span />
+            </button>
+          </div>
+        </nav>
+
+        {/* Mobile menu */}
+        <div
+          id="nf-mobile-menu"
+          className={`nf-mobile-panel${isMenuOpen ? ' is-open' : ''}`}
+          aria-hidden={!isMenuOpen}
+        >
+          <div className="nf-mobile-inner">
+            <ul className="nf-mobile-links">
+              {PRIMARY_LINKS.map((link) => (
+                <li key={link.href}>
+                  <Link
+                    to={link.href}
+                    className={`nf-mobile-link${isActive(link.href) ? ' is-active' : ''}`}
+                    aria-current={isActive(link.href) ? 'page' : undefined}
+                    onClick={closeNavigation}
+                  >
+                    <span>{link.label}</span>
+                    <Icon name="chevron-right" size={15} />
+                  </Link>
+                </li>
+              ))}
+
+              <li className={`nf-mobile-group${openMobileSection === 'more' ? ' is-open' : ''}`}>
+                <button
+                  type="button"
+                  className={`nf-mobile-trigger${isMoreActive ? ' is-active' : ''}`}
+                  aria-expanded={openMobileSection === 'more'}
+                  aria-controls="nf-mobile-more"
+                  onClick={() => toggleMobileSection('more')}
+                >
+                  <span>More</span>
+                  <Icon name="chevron-down" size={16} className="nf-chevron" />
+                </button>
+
+                <div
+                  id="nf-mobile-more"
+                  className="nf-mobile-submenu"
+                  aria-hidden={openMobileSection !== 'more'}
+                >
+                  <div className="nf-mobile-submenu-inner">
+                    {MORE_LINKS.map((item) => (
+                      <Link
+                        key={item.href}
+                        to={item.href}
+                        className={`nf-mobile-sublink${isActive(item.href) ? ' is-active' : ''}`}
+                        aria-current={isActive(item.href) ? 'page' : undefined}
+                        onClick={closeNavigation}
+                      >
+                        <span className="nf-mobile-sublink-icon">
+                          <Icon name={item.icon} size={15} />
+                        </span>
+                        <span>{item.label}</span>
+                        <Icon name="chevron-right" size={14} className="nf-mobile-sublink-arrow" />
+                      </Link>
+                    ))}
+                  </div>
+                </div>
+              </li>
+
+              <li
+                className={`nf-mobile-group${
+                  openMobileSection === 'dashboard' ? ' is-open' : ''
+                }`}
               >
-                Book Now
+                <button
+                  type="button"
+                  className={`nf-mobile-trigger${isDashboardActive ? ' is-active' : ''}`}
+                  aria-expanded={openMobileSection === 'dashboard'}
+                  aria-controls="nf-mobile-dashboard"
+                  onClick={() => toggleMobileSection('dashboard')}
+                >
+                  <span>Dashboard</span>
+                  <Icon name="chevron-down" size={16} className="nf-chevron" />
+                </button>
+
+                <div
+                  id="nf-mobile-dashboard"
+                  className="nf-mobile-submenu"
+                  aria-hidden={openMobileSection !== 'dashboard'}
+                >
+                  <div className="nf-mobile-submenu-inner">
+                    {dashboardLinks.map((item) => (
+                      <Link
+                        key={item.href}
+                        to={item.href}
+                        className={`nf-mobile-sublink${isActive(item.href) ? ' is-active' : ''}`}
+                        aria-current={isActive(item.href) ? 'page' : undefined}
+                        onClick={closeNavigation}
+                      >
+                        <span
+                          className={`nf-mobile-sublink-icon${
+                            item.href === '/admin' ? ' nf-mobile-sublink-icon-admin' : ''
+                          }`}
+                        >
+                          <Icon name={item.icon} size={15} />
+                        </span>
+                        <span>{item.label}</span>
+                        <Icon name="chevron-right" size={14} className="nf-mobile-sublink-arrow" />
+                      </Link>
+                    ))}
+                  </div>
+                </div>
+              </li>
+            </ul>
+
+            <div className="nf-mobile-footer">
+              {user ? (
+                <Link
+                  to={dashboardPath}
+                  className="nf-mobile-account-row"
+                  onClick={closeNavigation}
+                >
+                  <NavAvatar user={user} />
+                  <span className="nf-mobile-account-copy">
+                    <small>{isAdmin ? 'Administrator' : 'Signed in'}</small>
+                    <strong>{user.name}</strong>
+                  </span>
+                  <Icon name="chevron-right" size={16} />
+                </Link>
+              ) : !authLoading ? (
+                <div className="nf-mobile-auth-links">
+                  <Link to="/signin" className="nf-mobile-auth-link" onClick={closeNavigation}>
+                    Sign In
+                  </Link>
+                  <Link to="/signup" className="nf-mobile-auth-link" onClick={closeNavigation}>
+                    Create Account
+                  </Link>
+                </div>
+              ) : null}
+
+              <Link to="/booking" className="nf-mobile-cta" onClick={closeNavigation}>
+                <Icon name="calendar" size={16} />
+                <span>Book Now</span>
+                <Icon name="arrow-right" size={15} />
               </Link>
-            </li>
-          </ul>
+            </div>
+          </div>
         </div>
       </div>
     </header>

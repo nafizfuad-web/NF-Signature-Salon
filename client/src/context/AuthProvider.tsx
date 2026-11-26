@@ -14,7 +14,7 @@ import {
   getStoredToken,
   setStoredToken,
 } from '@/services/authStorage'
-import type { AuthUser, LoginCredentials, RegisterData } from '@/types'
+import type { AuthUser, LoginCredentials, RegisterData, RegistrationResult } from '@/types'
 import { getErrorMessage, getErrorStatus } from '@/utils/errors'
 
 interface AuthProviderProps {
@@ -110,19 +110,26 @@ export default function AuthProvider({ children }: AuthProviderProps) {
   )
 
   const register = useCallback(
-    async (data: RegisterData) => {
+    async (data: RegisterData): Promise<RegistrationResult> => {
       const response = await registerRequest(data)
 
-      // Some Express implementations return only the created user. In that
-      // case we immediately perform a real sign-in request to obtain a token.
+      if (response.requiresEmailVerification) {
+        return response
+      }
+
       if (response.token) {
         applySession(response.token, response.user)
-        return response.user
+        return response
       }
 
       const session = await loginRequest({ email: data.email, password: data.password })
       applySession(session.token, session.user)
-      return session.user
+      return {
+        token: session.token,
+        user: session.user,
+        requiresEmailVerification: false,
+        verificationEmailSent: false,
+      }
     },
     [applySession]
   )

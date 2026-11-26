@@ -12,16 +12,17 @@
 import { apiGet, apiPatch } from '@/services/api/client'
 import { USE_MOCK_DATA } from '@/services/config'
 import {
-  mockAdminBookings,
   mockAdminDashboard,
   mockCustomers,
   mockDelay,
 } from '@/services/mockData'
 import type {
   AdminDashboardData,
+  AdminPaymentsResponse,
   Appointment,
   AppointmentStatus,
   CustomerRecord,
+  PaymentTransaction,
 } from '@/types'
 
 function asRecord(value: unknown): Record<string, unknown> {
@@ -49,11 +50,6 @@ export async function fetchAdminDashboard(): Promise<AdminDashboardData> {
 }
 
 export async function fetchAdminBookings(): Promise<Appointment[]> {
-  if (USE_MOCK_DATA) {
-    await mockDelay()
-    return mockAdminBookings
-  }
-
   const payload = await apiGet<unknown>('/admin/bookings')
   return extractList<Appointment>(payload, 'bookings')
 }
@@ -62,20 +58,50 @@ export async function updateBookingStatus(
   bookingId: string,
   status: AppointmentStatus
 ): Promise<Appointment> {
-  if (USE_MOCK_DATA) {
-    await mockDelay(250)
-    const existing = mockAdminBookings.find((booking) => booking.id === bookingId)
-    if (!existing) {
-      throw new Error('We could not find that booking.')
-    }
-    return { ...existing, status }
-  }
-
   const payload = await apiPatch<unknown>(`/admin/bookings/${encodeURIComponent(bookingId)}/status`, {
     status,
   })
   const record = asRecord(payload)
   return (record.booking ?? record.data ?? payload) as Appointment
+}
+
+function extractData(payload: unknown): unknown {
+  const record = asRecord(payload)
+  return record.data ?? payload
+}
+
+export interface AdminPaymentFilters {
+  method?: string
+  status?: string
+  q?: string
+  limit?: number
+}
+
+export async function fetchAdminPayments(
+  filters: AdminPaymentFilters = {}
+): Promise<AdminPaymentsResponse> {
+  const params = new URLSearchParams()
+  if (filters.method) params.set('method', filters.method)
+  if (filters.status) params.set('status', filters.status)
+  if (filters.q?.trim()) params.set('q', filters.q.trim())
+  if (filters.limit) params.set('limit', String(filters.limit))
+  const query = params.toString()
+  const payload = await apiGet<unknown>(`/admin/payments${query ? `?${query}` : ''}`)
+  return extractData(payload) as AdminPaymentsResponse
+}
+
+export async function confirmCashReceived(
+  transactionId: string
+): Promise<{ transaction: PaymentTransaction; appointment?: Appointment }> {
+  const payload = await apiPatch<unknown>(
+    `/admin/payments/${encodeURIComponent(transactionId)}/cash-received`
+  )
+  const record = asRecord(payload)
+  const data = asRecord(record.data ?? payload)
+  return {
+    transaction: (data.transaction ?? data) as PaymentTransaction,
+    appointment: data.appointment as Appointment | undefined,
+  }
 }
 
 export async function fetchAdminCustomers(): Promise<CustomerRecord[]> {

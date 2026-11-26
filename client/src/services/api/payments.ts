@@ -6,6 +6,7 @@ import { apiGet, apiPost } from '@/services/api/client'
 import type {
   Appointment,
   AppointmentPaymentState,
+  AppointmentPaymentStatus,
   PaymentMethodsResponse,
   PaymentMethodId,
   PaymentSimulationOutcome,
@@ -80,4 +81,68 @@ export async function simulatePaymentOutcome(
     transaction: (data.transaction ?? data) as PaymentTransaction,
     appointment: data.appointment as Appointment | undefined,
   }
+}
+
+export async function createStripeCheckoutSession(
+  appointmentId: string,
+  options?: { successUrl?: string; cancelUrl?: string }
+): Promise<{ checkoutUrl: string; sessionId: string; transaction: PaymentTransaction; idempotentReplay: boolean }> {
+  const payload = await apiPost<unknown>(
+    `/payments/stripe/appointments/${encodeURIComponent(appointmentId)}/session`,
+    options
+  )
+  const record = asRecord(payload)
+  const data = asRecord(record.data ?? payload)
+  return {
+    checkoutUrl: data.checkoutUrl as string,
+    sessionId: data.sessionId as string,
+    transaction: (data.transaction ?? data) as PaymentTransaction,
+    idempotentReplay: record.idempotentReplay === true,
+  }
+}
+
+export interface ProviderPaymentStatusResponse {
+  transaction: PaymentTransaction
+  appointment: Appointment | null
+  payment: {
+    status: AppointmentPaymentStatus
+    method?: PaymentMethodId
+    paidAt?: string
+  }
+}
+
+export interface StripePaymentStatusResponse extends ProviderPaymentStatusResponse {}
+
+export async function createBkashCheckoutSession(
+  appointmentId: string
+): Promise<{ checkoutUrl: string; paymentId: string; transaction: PaymentTransaction; idempotentReplay: boolean }> {
+  const payload = await apiPost<unknown>(
+    `/payments/bkash/appointments/${encodeURIComponent(appointmentId)}/session`
+  )
+  const record = asRecord(payload)
+  const data = asRecord(record.data ?? payload)
+  return {
+    checkoutUrl: data.checkoutUrl as string,
+    paymentId: data.paymentId as string,
+    transaction: (data.transaction ?? data) as PaymentTransaction,
+    idempotentReplay: record.idempotentReplay === true,
+  }
+}
+
+export async function fetchBkashPaymentStatus(
+  paymentId: string
+): Promise<ProviderPaymentStatusResponse> {
+  const payload = await apiGet<unknown>(
+    `/payments/bkash/payments/${encodeURIComponent(paymentId)}`
+  )
+  return extractData(payload) as ProviderPaymentStatusResponse
+}
+
+export async function fetchStripePaymentStatus(
+  sessionId: string
+): Promise<StripePaymentStatusResponse> {
+  const payload = await apiGet<unknown>(
+    `/payments/stripe/sessions/${encodeURIComponent(sessionId)}`
+  )
+  return extractData(payload) as StripePaymentStatusResponse
 }

@@ -1,5 +1,5 @@
 import { createContext } from 'react'
-import type { AuthUser, LoginCredentials, RegisterData } from '@/types'
+import type { AuthUser, LoginCredentials, RegisterData, RegistrationResult } from '@/types'
 
 export interface AuthContextValue {
   user: AuthUser | null
@@ -9,7 +9,7 @@ export interface AuthContextValue {
   isAuthenticated: boolean
   login: (credentials: LoginCredentials) => Promise<AuthUser>
   loginWithGoogle: () => Promise<AuthUser>
-  register: (data: RegisterData) => Promise<AuthUser>
+  register: (data: RegisterData) => Promise<RegistrationResult>
   logout: () => Promise<void>
   restoreSession: () => Promise<void>
   updateUser: (user: AuthUser) => void

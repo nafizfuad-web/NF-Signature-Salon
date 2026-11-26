@@ -169,7 +169,7 @@ function CustomerAppointmentsContent() {
 
       <DashboardCard
         title="TEST payment history"
-        description="Simulated payments only. No real money is charged."
+        description="TEST payments only. No real money is charged."
       >
         <PaymentHistory refreshKey={historyKey} />
       </DashboardCard>

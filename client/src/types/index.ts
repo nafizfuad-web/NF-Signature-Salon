@@ -94,6 +94,14 @@ export interface AuthResponse {
   user: AuthUser
 }
 
+export interface RegistrationResult {
+  token?: string
+  user: AuthUser
+  requiresEmailVerification: boolean
+  verificationEmailSent: boolean
+  message?: string
+}
+
 export interface ProfileUpdate {
   name: string
   email: string
@@ -115,6 +123,7 @@ export interface Appointment {
   time: string
   duration?: string
   price?: string
+  priceAmount?: number
   status: AppointmentStatus
   staffName?: string
   notes?: string
@@ -172,7 +181,16 @@ export interface BookingStatusUpdate {
 /* TEST payments (simulated only)                                             */
 /* -------------------------------------------------------------------------- */
 
-export type PaymentMethodId = 'stripe_demo' | 'bkash_demo' | 'nagad_demo' | 'pay_at_salon'
+export type PaymentMethodId =
+  | 'stripe'
+  | 'bkash'
+  | 'nagad'
+  | 'stripe_demo'
+  | 'bkash_demo'
+  | 'nagad_demo'
+  | 'pay_at_salon'
+export type PaymentProvider = 'internal_simulator' | 'salon_cash' | 'stripe' | 'bkash' | 'nagad'
+export type PaymentMethodMode = 'real' | 'simulated' | 'cash'
 export type AppointmentPaymentStatus = 'unpaid' | 'pending' | 'paid'
 export type PaymentTransactionStatus =
   | 'pending'
@@ -182,25 +200,29 @@ export type PaymentTransactionStatus =
   | 'cancelled'
   | 'cash_pending'
   | 'cash_received'
+  | 'refunded'
 export type PaymentSimulationOutcome = 'success' | 'failed' | 'cancelled'
 
 export interface PaymentMethod {
   id: PaymentMethodId
   label: string
-  provider: 'internal_simulator' | 'salon_cash'
+  provider: PaymentProvider
+  mode: PaymentMethodMode
   requiresSimulation: boolean
-  simulated: true
-  environment: 'TEST'
+  available: boolean
+  reason: string | null
+  simulated: boolean
+  environment: 'TEST' | 'LIVE'
   currency: 'BDT'
 }
 
 export interface PaymentMethodsResponse {
   enabled: boolean
-  environment: 'TEST'
+  environment: 'TEST' | 'LIVE'
   currency: 'BDT'
   amount: number | null
-  amountBasis: 'configured_test_demo'
-  simulated: true
+  amountBasis: 'configured_test_demo' | 'service_price'
+  simulated: boolean
   methods: PaymentMethod[]
   reason: string | null
 }
@@ -216,18 +238,48 @@ export interface PaymentTransaction {
   displayPrice?: string
   amount: number
   currency: 'BDT'
-  amountBasis: 'configured_test_demo'
+  amountBasis: 'configured_test_demo' | 'service_price'
   paymentMethod: PaymentMethodId
-  provider: 'internal_simulator' | 'salon_cash'
+  provider: PaymentProvider
+  providerReference?: string
+  providerEventId?: string
+  refundReason?: string
+  customerName?: string
+  customerEmail?: string
+  customerPhone?: string
+  appointmentStatus?: AppointmentStatus
+  staffName?: string
   paymentStatus: PaymentTransactionStatus
   environment: 'TEST' | 'LIVE'
   simulated: boolean
+  checkoutUrl?: string
+  providerSessionId?: string
+  providerPaymentIntentId?: string
+  providerVerifiedAt?: string
+  refundedAmount?: number
+  refundedAt?: string
   simulationOutcome?: PaymentSimulationOutcome
   failureReason?: string
   paidAt?: string
+  cashConfirmedBy?: string
   cashConfirmedAt?: string
   createdAt?: string
   updatedAt?: string
+}
+
+export interface AdminPaymentStats {
+  transactionCount: number
+  byStatus: Record<string, number>
+  settledCount: number
+  testSimulatedAmountTotal: number
+  currency: 'BDT'
+  realRevenueAmount: number
+}
+
+export interface AdminPaymentsResponse {
+  scope: string
+  stats: AdminPaymentStats
+  transactions: PaymentTransaction[]
 }
 
 export interface AppointmentPaymentState {

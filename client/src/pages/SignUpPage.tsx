@@ -119,14 +119,27 @@ export default function SignUpPage() {
     submittingRef.current = true
     setSubmitting(true)
     try {
-      const createdUser = await register({
+      const result = await register({
         name: name.trim(),
         email: email.trim(),
         phone: phone.trim() || undefined,
         password,
       })
-      toast.success('Account created', `Welcome to NF Signature, ${createdUser.name.split(' ')[0]}.`)
-      navigate(destinationFor(createdUser, redirect), { replace: true })
+
+      if (result.requiresEmailVerification) {
+        toast.success(
+          'Check your email',
+          result.message ?? 'We sent a verification link to your email address.'
+        )
+        navigate(
+          `/verify-email?email=${encodeURIComponent(email.trim())}`,
+          { replace: true }
+        )
+        return
+      }
+
+      toast.success('Account created', `Welcome to NF Signature, ${result.user.name.split(' ')[0]}.`)
+      navigate(destinationFor(result.user, redirect), { replace: true })
     } catch (caught) {
       const message = getErrorMessage(caught, 'Unable to create your account. Please try again.')
       setFormError(message)

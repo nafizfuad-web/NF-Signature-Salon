@@ -29,6 +29,7 @@ const CUSTOMER_NAV: DashboardNavItem[] = [
 const ADMIN_NAV: DashboardNavItem[] = [
   { label: 'Overview', to: '/admin', icon: 'grid', end: true },
   { label: 'Bookings', to: '/admin/bookings', icon: 'calendar' },
+  { label: 'Payments', to: '/admin/payments', icon: 'chart' },
   { label: 'Services', to: '/admin/services', icon: 'briefcase' },
   { label: 'Customers', to: '/admin/customers', icon: 'users' },
 ]

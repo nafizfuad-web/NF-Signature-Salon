@@ -5,16 +5,22 @@ import Layout from '@/components/layout/Layout'
 import AboutPage from '@/pages/AboutPage'
 import BookingPage from '@/pages/BookingPage'
 import ContactPage from '@/pages/ContactPage'
+import ForgotPasswordPage from '@/pages/ForgotPasswordPage'
 import GalleryPage from '@/pages/GalleryPage'
 import HomePage from '@/pages/HomePage'
 import NotFoundPage from '@/pages/NotFoundPage'
+import PaymentCancelPage from '@/pages/PaymentCancelPage'
+import PaymentSuccessPage from '@/pages/PaymentSuccessPage'
+import ResetPasswordPage from '@/pages/ResetPasswordPage'
 import ServiceDetailsPage from '@/pages/ServiceDetailsPage'
 import ServicesPage from '@/pages/ServicesPage'
 import SignInPage from '@/pages/SignInPage'
 import SignUpPage from '@/pages/SignUpPage'
+import VerifyEmailPage from '@/pages/VerifyEmailPage'
 import AdminBookingsPage from '@/pages/dashboard/AdminBookingsPage'
 import AdminCustomersPage from '@/pages/dashboard/AdminCustomersPage'
 import AdminDashboardPage from '@/pages/dashboard/AdminDashboardPage'
+import AdminPaymentsPage from '@/pages/dashboard/AdminPaymentsPage'
 import AdminServicesPage from '@/pages/dashboard/AdminServicesPage'
 import CustomerAppointmentsPage from '@/pages/dashboard/CustomerAppointmentsPage'
 import CustomerDashboardPage from '@/pages/dashboard/CustomerDashboardPage'
@@ -32,12 +38,17 @@ export default function App() {
           <Route path="booking" element={<BookingPage />} />
           <Route path="about" element={<AboutPage />} />
           <Route path="contact" element={<ContactPage />} />
+          <Route path="payment/success" element={<PaymentSuccessPage />} />
+          <Route path="payment/cancel" element={<PaymentCancelPage />} />
           <Route path="*" element={<NotFoundPage />} />
         </Route>
 
         <Route element={<AuthLayout />}>
           <Route path="signin" element={<SignInPage />} />
           <Route path="signup" element={<SignUpPage />} />
+          <Route path="forgot-password" element={<ForgotPasswordPage />} />
+          <Route path="reset-password" element={<ResetPasswordPage />} />
+          <Route path="verify-email" element={<VerifyEmailPage />} />
         </Route>
 
         <Route path="dashboard" element={<DashboardLayout variant="customer" />}>
@@ -50,6 +61,7 @@ export default function App() {
         <Route path="admin" element={<DashboardLayout variant="admin" />}>
           <Route index element={<AdminDashboardPage />} />
           <Route path="bookings" element={<AdminBookingsPage />} />
+          <Route path="payments" element={<AdminPaymentsPage />} />
           <Route path="services" element={<AdminServicesPage />} />
           <Route path="customers" element={<AdminCustomersPage />} />
           <Route path="*" element={<Navigate to="/admin" replace />} />

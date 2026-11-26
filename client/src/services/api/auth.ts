@@ -4,12 +4,13 @@
 // backend, which is responsible for password hashing and JWT issuance.
 
 import { apiGet, apiPost, type ApiError } from '@/services/api/client'
-import type { AuthResponse, AuthUser, LoginCredentials, RegisterData } from '@/types'
-
-export interface RegisterResponse {
-  token?: string
-  user: AuthUser
-}
+import type {
+  AuthResponse,
+  AuthUser,
+  LoginCredentials,
+  RegisterData,
+  RegistrationResult,
+} from '@/types'
 
 function asRecord(value: unknown): Record<string, unknown> | null {
   return value && typeof value === 'object' && !Array.isArray(value)
@@ -76,8 +77,10 @@ export async function login(credentials: LoginCredentials): Promise<AuthResponse
   return { token, user }
 }
 
-export async function register(data: RegisterData): Promise<RegisterResponse> {
+export async function register(data: RegisterData): Promise<RegistrationResult> {
   const payload = await apiPost<unknown>('/auth/register', data, { auth: false })
+  const record = asRecord(payload)
+  const nested = asRecord(record?.data)
   const { token, user: rawUser } = extractAuthPayload(payload)
   const user = parseAuthUser(rawUser)
 
@@ -87,7 +90,16 @@ export async function register(data: RegisterData): Promise<RegisterResponse> {
     )
   }
 
-  return { ...(token ? { token } : {}), user }
+  const verificationEmail = asRecord(record?.verificationEmail ?? nested?.verificationEmail)
+  const messageValue = record?.message ?? nested?.message
+  return {
+    ...(token ? { token } : {}),
+    user,
+    requiresEmailVerification:
+      record?.requiresEmailVerification === true || nested?.requiresEmailVerification === true,
+    verificationEmailSent: verificationEmail?.sent === true,
+    ...(typeof messageValue === 'string' ? { message: messageValue } : {}),
+  }
 }
 
 export async function getCurrentUser(): Promise<AuthUser> {
@@ -105,4 +117,24 @@ export async function getCurrentUser(): Promise<AuthUser> {
 
 export async function logout(): Promise<void> {
   await apiPost<void>('/auth/logout')
+}
+
+export async function forgotPassword(email: string): Promise<void> {
+  await apiPost<void>('/auth/forgot-password', { email }, { auth: false })
+}
+
+export async function resetPassword(token: string, password: string): Promise<void> {
+  await apiPost<void>('/auth/reset-password', { token, password }, { auth: false })
+}
+
+export async function verifyEmail(token: string): Promise<void> {
+  await apiPost<void>('/auth/verify-email', { token }, { auth: false })
+}
+
+export async function resendVerification(): Promise<void> {
+  await apiPost<void>('/auth/resend-verification')
+}
+
+export async function resendVerificationEmail(email: string): Promise<void> {
+  await apiPost<void>('/auth/resend-verification-email', { email }, { auth: false })
 }
