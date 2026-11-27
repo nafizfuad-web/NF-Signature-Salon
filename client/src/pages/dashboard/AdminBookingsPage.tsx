@@ -1,20 +1,21 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import ButtonLink from '@/components/common/ButtonLink'
 import EmptyState from '@/components/common/EmptyState'
 import ErrorState from '@/components/common/ErrorState'
 import Icon from '@/components/common/Icon'
-import AppointmentTable from '@/components/dashboard/AppointmentTable'
+import AdminBookingsTable from '@/components/dashboard/AdminBookingsTable'
+import AdminBookingModal from '@/components/dashboard/AdminBookingModal'
+import AdminCard from '@/components/dashboard/AdminCard'
+import AdminPageHeader from '@/components/dashboard/AdminPageHeader'
 import DashboardAccessGate from '@/components/dashboard/DashboardAccessGate'
-import DashboardCard from '@/components/dashboard/DashboardCard'
-import DashboardPageHeader from '@/components/dashboard/DashboardPageHeader'
 import TableSkeleton from '@/components/dashboard/TableSkeleton'
 import { useApiResource } from '@/hooks/useApiResource'
 import { useAuth } from '@/hooks/useAuth'
 import { useToast } from '@/hooks/useToast'
+import { cn } from '@/lib/cn'
 import { fetchAdminBookings, updateBookingStatus } from '@/services/api/admin'
 import type { Appointment, AppointmentStatus } from '@/types'
-import { cn } from '@/lib/cn'
 import { getErrorMessage } from '@/utils/errors'
+import { formatNumber } from '@/utils/format'
 
 type StatusFilter = AppointmentStatus | 'all'
 
@@ -34,6 +35,8 @@ function AdminBookingsContent() {
     [user?.id]
   )
   const [status, setStatus] = useState<StatusFilter>('all')
+  const [search, setSearch] = useState('')
+  const [selected, setSelected] = useState<Appointment | null>(null)
   const [updating, setUpdating] = useState<{ id: string; status: AppointmentStatus } | null>(null)
   const lastError = useRef<string | null>(null)
 
@@ -45,9 +48,17 @@ function AdminBookingsContent() {
   }, [error, toast])
 
   const bookings = useMemo(() => {
-    const all = data ?? []
-    return status === 'all' ? all : all.filter((booking) => booking.status === status)
-  }, [data, status])
+    const query = search.trim().toLowerCase()
+    return (data ?? []).filter((booking) => {
+      if (status !== 'all' && booking.status !== status) return false
+      if (!query) return true
+      return [booking.customerName, booking.customerEmail, booking.serviceTitle, booking.date]
+        .filter(Boolean)
+        .join(' ')
+        .toLowerCase()
+        .includes(query)
+    })
+  }, [data, search, status])
 
   const handleStatusChange = async (bookingId: string, nextStatus: AppointmentStatus) => {
     setUpdating({ id: bookingId, status: nextStatus })
@@ -59,6 +70,7 @@ function AdminBookingsContent() {
         )
       )
       toast.success('Booking updated', `The booking is now ${nextStatus}.`)
+      setSelected(null)
     } catch (caught) {
       toast.error('Could not update the booking', getErrorMessage(caught))
     } finally {
@@ -66,84 +78,125 @@ function AdminBookingsContent() {
     }
   }
 
+  const handleCancel = (appointment: Appointment) => {
+    const name = appointment.customerName ?? 'this customer'
+    if (!window.confirm(`Cancel the booking for ${name}?`)) return
+    void handleStatusChange(appointment.id, 'cancelled')
+  }
+
+  const clearFilters = () => {
+    setSearch('')
+    setStatus('all')
+  }
+
   const total = data?.length ?? 0
+  const hasFilters = search.trim().length > 0 || status !== 'all'
 
   return (
     <>
-      <DashboardPageHeader
-        eyebrow="Salon operations"
+      <AdminPageHeader
         title="Bookings"
-        description="Confirm new requests, mark visits as complete and keep the day moving."
-        actions={
-          <ButtonLink to="/admin" variant="outline" leftIcon={<Icon name="grid" size={15} />}>
-            Back to overview
-          </ButtonLink>
-        }
+        description="View, search and manage every appointment request."
       />
 
-      <div className="dashboard-filter-bar" role="group" aria-label="Filter bookings by status">
-        {STATUS_FILTERS.map((option) => {
-          const count =
-            option.value === 'all'
-              ? total
-              : (data ?? []).filter((booking) => booking.status === option.value).length
-          return (
+      <div className="admin-toolbar">
+        <div className="admin-search">
+          <span className="admin-search-icon" aria-hidden="true">
+            <Icon name="search" size={17} />
+          </span>
+          <input
+            type="search"
+            value={search}
+            onChange={(event) => setSearch(event.target.value)}
+            placeholder="Search customer or service…"
+            aria-label="Search bookings"
+          />
+          {search && (
             <button
-              key={option.value}
               type="button"
-              className={cn('chip', status === option.value && 'chip-active')}
-              onClick={() => setStatus(option.value)}
-              aria-pressed={status === option.value}
+              className="admin-search-clear"
+              onClick={() => setSearch('')}
+              aria-label="Clear booking search"
             >
-              {option.label}
-              <span className="chip-count">{count}</span>
+              <Icon name="x" size={15} />
             </button>
-          )
-        })}
+          )}
+        </div>
+
+        <div className="admin-filter-tabs" role="group" aria-label="Filter bookings by status">
+          {STATUS_FILTERS.map((option) => {
+            const count =
+              option.value === 'all'
+                ? total
+                : (data ?? []).filter((booking) => booking.status === option.value).length
+            return (
+              <button
+                key={option.value}
+                type="button"
+                className={cn('admin-filter-tab', status === option.value && 'is-active')}
+                onClick={() => setStatus(option.value)}
+                aria-pressed={status === option.value}
+              >
+                {option.label}
+                <span>{formatNumber(count)}</span>
+              </button>
+            )
+          })}
+        </div>
+
+        <span className="admin-results-meta">
+          Showing <strong>{formatNumber(bookings.length)}</strong> of {formatNumber(total)}
+        </span>
       </div>
 
-      <DashboardCard padded={false}>
+      <AdminCard padded={false}>
         {loading ? (
-          <div className="dashboard-card-pad">
-            <TableSkeleton rows={6} columns={7} />
+          <div className="admin-card-pad">
+            <TableSkeleton rows={6} columns={6} />
           </div>
         ) : error ? (
-          <div className="dashboard-card-pad">
-            <ErrorState
-              title="We couldn't load bookings"
-              message={error}
-              onRetry={refetch}
-            />
+          <div className="admin-card-pad">
+            <ErrorState title="We couldn't load bookings" message={error} onRetry={refetch} />
           </div>
         ) : bookings.length === 0 ? (
-          <div className="dashboard-card-pad">
+          <div className="admin-card-pad">
             <EmptyState
               icon="calendar"
-              title={status === 'all' ? 'No bookings yet' : `No ${status} bookings`}
+              title={hasFilters ? 'No bookings match' : 'No bookings yet'}
               description={
-                status === 'all'
-                  ? 'New customer requests will appear here.'
-                  : 'Try another status filter to see the rest of the bookings.'
+                hasFilters
+                  ? 'Try a different search or status filter.'
+                  : 'New customer requests will appear here.'
               }
               action={
-                status !== 'all' ? (
-                  <button type="button" className="btn btn-outline btn-md" onClick={() => setStatus('all')}>
-                    Show all bookings
+                hasFilters ? (
+                  <button type="button" className="btn btn-outline btn-md" onClick={clearFilters}>
+                    Clear filters
                   </button>
                 ) : undefined
               }
             />
           </div>
         ) : (
-          <AppointmentTable
+          <AdminBookingsTable
             appointments={bookings}
-            variant="admin"
-            onStatusChange={handleStatusChange}
+            onOpen={setSelected}
+            onCancel={handleCancel}
             updatingId={updating?.id ?? null}
             updatingStatus={updating?.status ?? null}
           />
         )}
-      </DashboardCard>
+      </AdminCard>
+
+      {selected && (
+        <AdminBookingModal
+          appointment={selected}
+          onClose={() => setSelected(null)}
+          onStatusChange={(bookingId, nextStatus) => void handleStatusChange(bookingId, nextStatus)}
+          updating={Boolean(updating)}
+          updatingStatus={updating?.status ?? null}
+        />
+      )}
     </>
   )
 }

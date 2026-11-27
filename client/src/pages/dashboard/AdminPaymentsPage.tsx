@@ -1,11 +1,14 @@
 import { useMemo, useState } from 'react'
 import Button from '@/components/common/Button'
-import DashboardAccessGate from '@/components/dashboard/DashboardAccessGate'
-import DashboardCard from '@/components/dashboard/DashboardCard'
-import DashboardPageHeader from '@/components/dashboard/DashboardPageHeader'
 import EmptyState from '@/components/common/EmptyState'
 import ErrorState from '@/components/common/ErrorState'
-import LoadingState from '@/components/common/LoadingState'
+import Icon from '@/components/common/Icon'
+import AdminCard from '@/components/dashboard/AdminCard'
+import AdminPageHeader from '@/components/dashboard/AdminPageHeader'
+import AdminStatCard from '@/components/dashboard/AdminStatCard'
+import DashboardAccessGate from '@/components/dashboard/DashboardAccessGate'
+import { AdminPaymentStatus } from '@/components/dashboard/AdminStatusPill'
+import TableSkeleton from '@/components/dashboard/TableSkeleton'
 import { useApiResource } from '@/hooks/useApiResource'
 import { useAuth } from '@/hooks/useAuth'
 import { useToast } from '@/hooks/useToast'
@@ -13,7 +16,7 @@ import { confirmCashReceived, fetchAdminPayments } from '@/services/api/admin'
 import type { AdminPaymentsResponse, PaymentTransaction } from '@/types'
 import type { PaymentMethodId, PaymentTransactionStatus } from '@/types'
 import { getErrorMessage } from '@/utils/errors'
-import { formatShortDate } from '@/utils/format'
+import { formatMoney, formatNumber, formatShortDate } from '@/utils/format'
 
 const METHOD_LABELS: Record<string, string> = {
   stripe: 'Card via Stripe',
@@ -89,151 +92,188 @@ function AdminPaymentsContent() {
     }
   }
 
-  if (loading) return <LoadingState label="Loading payment records…" />
-  if (error) {
-    return (
-      <ErrorState
-        title="We couldn't load payments"
-        message={error}
-        onRetry={refetch}
-      />
-    )
-  }
-
   return (
     <>
-      <DashboardPageHeader
-        eyebrow="Salon operations"
-        title="Payment management"
-        description="Review TEST payment records, filter by method/status, and confirm cash received for Pay at Salon appointments."
+      <AdminPageHeader
+        title="Payments"
+        description="Review transactions, payment methods, currencies and payment statuses."
       />
 
-      <div className="dashboard-filter-bar" role="group" aria-label="Filter payment transactions">
-        <select
-          className="form-input"
-          value={methodFilter}
-          onChange={(event) => setMethodFilter(event.target.value as PaymentMethodId | '')}
-          aria-label="Filter by payment method"
-        >
-          <option value="">All methods</option>
-          {Object.entries(METHOD_LABELS).map(([value, label]) => (
-            <option key={value} value={value}>{label}</option>
-          ))}
-        </select>
-        <select
-          className="form-input"
-          value={statusFilter}
-          onChange={(event) => setStatusFilter(event.target.value as PaymentTransactionStatus | '')}
-          aria-label="Filter by payment status"
-        >
-          <option value="">All statuses</option>
-          {Object.entries(STATUS_LABELS).map(([value, label]) => (
-            <option key={value} value={value}>{label}</option>
-          ))}
-        </select>
-        <input
-          className="form-input"
-          type="search"
-          value={search}
-          onChange={(event) => setSearch(event.target.value)}
-          placeholder="Search service or reference"
-          aria-label="Search payment transactions"
-        />
-      </div>
-
-      <div className="stats-grid">
-        <article className="stat-card">
-          <div>
-            <span className="stat-card-label">Transactions</span>
-            <strong className="stat-card-value">{data?.stats.transactionCount ?? 0}</strong>
-          </div>
-        </article>
-        <article className="stat-card">
-          <div>
-            <span className="stat-card-label">Cash pending</span>
-            <strong className="stat-card-value">{cashPending.length}</strong>
-          </div>
-        </article>
-        <article className="stat-card">
-          <div>
-            <span className="stat-card-label">Settled TEST amount</span>
-            <strong className="stat-card-value">BDT {data?.stats.testSimulatedAmountTotal ?? 0}</strong>
-          </div>
-        </article>
-        <article className="stat-card">
-          <div>
-            <span className="stat-card-label">Real revenue</span>
-            <strong className="stat-card-value">BDT {data?.stats.realRevenueAmount ?? 0}</strong>
-          </div>
-        </article>
-      </div>
-
-      <DashboardCard
-        title="Payment transactions"
-        description="TEST payment records, provider references and salon cash confirmations are shown here."
-        padded={false}
-      >
-        {transactions.length === 0 ? (
-          <div className="dashboard-card-pad">
-            <EmptyState
-              icon="chart"
-              title="No payment records yet"
-              description="Payment attempts will appear here after customers start checkout or Pay at Salon."
-            />
-          </div>
-        ) : (
-          <div className="payment-history-list">
-            {transactions.map((transaction) => (
-              <article key={transaction.id} className="payment-history-row">
-                <div>
-                  <strong>{transaction.serviceTitle}</strong>
-                  <span>
-                    {formatShortDate(transaction.appointmentDate)} · {transaction.appointmentTime} · BDT {transaction.amount}
-                  </span>
-                  <small>
-                    {transaction.customerName
-                      ? `${transaction.customerName}${transaction.customerEmail ? ` · ${transaction.customerEmail}` : ''}`
-                      : transaction.customerEmail ?? ''}
-                  </small>
-                  <small>
-                    {[
-                      transaction.appointmentStatus ? `Booking ${transaction.appointmentStatus}` : null,
-                      transaction.staffName ? `Staff ${transaction.staffName}` : null,
-                      transaction.providerReference ? `Ref ${transaction.providerReference}` : null,
-                    ]
-                      .filter(Boolean)
-                      .join(' · ')}
-                  </small>
-                  <small>
-                    {transaction.cashConfirmedBy ? `Confirmed by ${transaction.cashConfirmedBy}` : ''}
-                    {transaction.cashConfirmedBy && transaction.cashConfirmedAt ? ' · ' : ''}
-                    {transaction.cashConfirmedAt ? formatShortDate(transaction.cashConfirmedAt) : ''}
-                  </small>
+      {loading ? (
+        <>
+          <div className="admin-stats-grid" aria-hidden="true">
+            {Array.from({ length: 4 }).map((_, index) => (
+              <div className="admin-stat-card" key={index}>
+                <div className="admin-stat-copy">
+                  <span className="admin-stat-label">Loading</span>
+                  <strong className="admin-stat-value">—</strong>
                 </div>
-                <div>
-                  <strong>{METHOD_LABELS[transaction.paymentMethod] ?? transaction.paymentMethod}</strong>
-                  <span>{transaction.environment}{transaction.simulated ? ' · simulated' : ''}</span>
-                </div>
-                <div className="payment-history-actions">
-                  <span className={`payment-status payment-status-${transaction.paymentStatus}`}>
-                    {STATUS_LABELS[transaction.paymentStatus] ?? transaction.paymentStatus}
-                  </span>
-                  {isCashPending(transaction) && (
-                    <Button
-                      size="sm"
-                      variant="primary"
-                      loading={confirmingId === transaction.id}
-                      onClick={() => void confirmCash(transaction)}
-                    >
-                      Confirm cash
-                    </Button>
-                  )}
-                </div>
-              </article>
+              </div>
             ))}
           </div>
-        )}
-      </DashboardCard>
+          <AdminCard padded={false}>
+            <div className="admin-card-pad">
+              <TableSkeleton rows={6} columns={6} />
+            </div>
+          </AdminCard>
+        </>
+      ) : error ? (
+        <ErrorState title="We couldn't load payments" message={error} onRetry={refetch} />
+      ) : (
+        <>
+          <div className="admin-stats-grid">
+            <AdminStatCard
+              icon="wallet"
+              label="Transactions"
+              value={formatNumber(data?.stats.transactionCount ?? 0)}
+            />
+            <AdminStatCard
+              icon="clock"
+              label="Cash pending"
+              value={formatNumber(cashPending.length)}
+            />
+            <AdminStatCard
+              icon="dollar"
+              label="Settled TEST amount"
+              value={formatMoney(data?.stats.testSimulatedAmountTotal ?? 0)}
+            />
+            <AdminStatCard
+              icon="chart"
+              label="Real revenue"
+              value={formatMoney(data?.stats.realRevenueAmount ?? 0)}
+            />
+          </div>
+
+          <div className="admin-toolbar">
+            <select
+              className="admin-select"
+              value={methodFilter}
+              onChange={(event) => setMethodFilter(event.target.value as PaymentMethodId | '')}
+              aria-label="Filter by payment method"
+            >
+              <option value="">All methods</option>
+              {Object.entries(METHOD_LABELS).map(([value, label]) => (
+                <option key={value} value={value}>{label}</option>
+              ))}
+            </select>
+
+            <select
+              className="admin-select"
+              value={statusFilter}
+              onChange={(event) => setStatusFilter(event.target.value as PaymentTransactionStatus | '')}
+              aria-label="Filter by payment status"
+            >
+              <option value="">All statuses</option>
+              {Object.entries(STATUS_LABELS).map(([value, label]) => (
+                <option key={value} value={value}>{label}</option>
+              ))}
+            </select>
+
+            <div className="admin-search">
+              <span className="admin-search-icon" aria-hidden="true">
+                <Icon name="search" size={17} />
+              </span>
+              <input
+                type="search"
+                value={search}
+                onChange={(event) => setSearch(event.target.value)}
+                placeholder="Search service or reference…"
+                aria-label="Search payment transactions"
+              />
+              {search && (
+                <button
+                  type="button"
+                  className="admin-search-clear"
+                  onClick={() => setSearch('')}
+                  aria-label="Clear payment search"
+                >
+                  <Icon name="x" size={15} />
+                </button>
+              )}
+            </div>
+
+            <span className="admin-results-meta">
+              Showing <strong>{transactions.length}</strong> transactions
+            </span>
+          </div>
+
+          <AdminCard padded={false}>
+            {transactions.length === 0 ? (
+              <div className="admin-card-pad">
+                <EmptyState
+                  icon="wallet"
+                  title="No payment records yet"
+                  description="Payment attempts will appear here after customers start checkout or Pay at Salon."
+                />
+              </div>
+            ) : (
+              <div className="admin-table-wrap">
+                <table className="admin-table admin-payments-table">
+                  <caption className="sr-only">Payment transactions</caption>
+                  <thead>
+                    <tr>
+                      <th scope="col">Transaction</th>
+                      <th scope="col">Method</th>
+                      <th scope="col">Amount</th>
+                      <th scope="col">Currency</th>
+                      <th scope="col">Payment Status</th>
+                      <th scope="col"><span className="sr-only">Actions</span></th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {transactions.map((transaction) => (
+                      <tr key={transaction.id}>
+                        <td>
+                          <div className="admin-transaction-cell">
+                            <strong>{transaction.serviceTitle}</strong>
+                            <span>
+                              {formatShortDate(transaction.appointmentDate)} · {transaction.appointmentTime}
+                            </span>
+                            <small>
+                              {transaction.customerName
+                                ? `${transaction.customerName}${transaction.customerEmail ? ` · ${transaction.customerEmail}` : ''}`
+                                : transaction.customerEmail ?? 'Customer'}
+                            </small>
+                          </div>
+                        </td>
+                        <td>
+                          <div className="admin-method-cell">
+                            <strong>{METHOD_LABELS[transaction.paymentMethod] ?? transaction.paymentMethod}</strong>
+                            <span>
+                              {transaction.environment}
+                              {transaction.simulated ? ' · simulated' : ''}
+                              {transaction.providerReference ? ` · ${transaction.providerReference}` : ''}
+                            </span>
+                          </div>
+                        </td>
+                        <td>{formatNumber(transaction.amount)}</td>
+                        <td>{transaction.currency}</td>
+                        <td>
+                          <AdminPaymentStatus status={transaction.paymentStatus} />
+                        </td>
+                        <td>
+                          {isCashPending(transaction) ? (
+                            <Button
+                              size="sm"
+                              variant="primary"
+                              loading={confirmingId === transaction.id}
+                              onClick={() => void confirmCash(transaction)}
+                            >
+                              Confirm cash
+                            </Button>
+                          ) : (
+                            <span className="admin-muted-copy">—</span>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </AdminCard>
+        </>
+      )}
     </>
   )
 }

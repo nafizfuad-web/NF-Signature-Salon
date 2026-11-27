@@ -1,5 +1,6 @@
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
 import AuthLayout from '@/components/auth/AuthLayout'
+import AdminLayout from '@/components/dashboard/AdminLayout'
 import DashboardLayout from '@/components/dashboard/DashboardLayout'
 import Layout from '@/components/layout/Layout'
 import AboutPage from '@/pages/AboutPage'
@@ -59,7 +60,7 @@ export default function App() {
           <Route path="*" element={<Navigate to="/dashboard" replace />} />
         </Route>
 
-        <Route path="admin" element={<DashboardLayout variant="admin" />}>
+        <Route path="admin" element={<AdminLayout />}>
           <Route index element={<AdminDashboardPage />} />
           <Route path="bookings" element={<AdminBookingsPage />} />
           <Route path="payments" element={<AdminPaymentsPage />} />

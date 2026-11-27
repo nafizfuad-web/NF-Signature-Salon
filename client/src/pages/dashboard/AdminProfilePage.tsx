@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import type { FormEvent } from 'react'
 import Button from '@/components/common/Button'
-import DashboardCard from '@/components/dashboard/DashboardCard'
+import AdminCard from '@/components/dashboard/AdminCard'
 import DashboardAccessGate from '@/components/dashboard/DashboardAccessGate'
 import { CustomerProfileContent } from '@/pages/dashboard/CustomerProfilePage'
 import { useAuth } from '@/hooks/useAuth'
@@ -45,27 +45,56 @@ function AdminProfileContent() {
 
   return (
     <>
-      <CustomerProfileContent />
-      <DashboardCard title="Change password" description="Use a strong password for your admin account.">
-        {error && <div className="auth-alert" role="alert"><span>{error}</span></div>}
-        <form className="profile-form" onSubmit={handleSubmit} noValidate>
+      <CustomerProfileContent
+        title="Profile"
+        description="Manage your administrator account details, profile picture and password."
+        eyebrow=""
+      />
+      <AdminCard title="Change password" description="Use a strong password for your admin account.">
+        {error && (
+          <div className="auth-alert" role="alert">
+            <span>{error}</span>
+          </div>
+        )}
+        <form className="profile-form admin-form" onSubmit={handleSubmit} noValidate>
           <label className="form-field">
             <span>Current password</span>
-            <input className="form-input" type="password" autoComplete="current-password" value={currentPassword} onChange={(e) => setCurrentPassword(e.target.value)} required />
+            <input
+              className="form-input"
+              type="password"
+              autoComplete="current-password"
+              value={currentPassword}
+              onChange={(event) => setCurrentPassword(event.target.value)}
+              required
+            />
           </label>
           <label className="form-field">
             <span>New password</span>
-            <input className="form-input" type="password" autoComplete="new-password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} required />
+            <input
+              className="form-input"
+              type="password"
+              autoComplete="new-password"
+              value={newPassword}
+              onChange={(event) => setNewPassword(event.target.value)}
+              required
+            />
           </label>
           <label className="form-field">
             <span>Confirm new password</span>
-            <input className="form-input" type="password" autoComplete="new-password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} required />
+            <input
+              className="form-input"
+              type="password"
+              autoComplete="new-password"
+              value={confirmPassword}
+              onChange={(event) => setConfirmPassword(event.target.value)}
+              required
+            />
           </label>
           <div className="profile-form-actions">
             <Button type="submit" loading={saving}>Change password</Button>
           </div>
         </form>
-      </DashboardCard>
+      </AdminCard>
     </>
   )
 }

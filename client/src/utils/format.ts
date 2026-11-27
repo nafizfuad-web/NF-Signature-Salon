@@ -34,6 +34,14 @@ export function formatDateLong(date: string): string {
   })
 }
 
+export function formatNumber(value: number): string {
+  return new Intl.NumberFormat('en-US').format(Number.isFinite(value) ? value : 0)
+}
+
+export function formatMoney(value: number, currency = 'BDT'): string {
+  return `${currency} ${formatNumber(value)}`
+}
+
 export function getInitials(name: string): string {
   return name
     .split(' ')

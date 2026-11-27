@@ -63,30 +63,71 @@ function methodDisplayName(methodId: PaymentMethodId, simulated = false): string
 }
 
 const CHECKOUT_METHODS: Array<{
-  methodId: PaymentMethodId
+  key: 'card' | 'bkash' | 'nagad'
+  methodIds: PaymentMethodId[]
   label: string
   subtitle: string
   icon: IconName
 }> = [
   {
-    methodId: 'stripe',
+    key: 'card',
+    methodIds: ['stripe', 'stripe_demo'],
     label: 'Card Payment',
-    subtitle: 'Visa / Mastercard / Stripe',
+    subtitle: 'Visa / Mastercard',
     icon: 'chart',
   },
   {
-    methodId: 'bkash',
+    key: 'bkash',
+    methodIds: ['bkash', 'bkash_demo'],
     label: 'bKash',
     subtitle: 'Mobile payment',
     icon: 'phone',
   },
   {
-    methodId: 'nagad',
+    key: 'nagad',
+    methodIds: ['nagad', 'nagad_demo'],
     label: 'Nagad',
     subtitle: 'Mobile payment',
     icon: 'shield',
   },
 ]
+
+type DemoFieldKey = 'cardNumber' | 'expiry' | 'cvc' | 'cardholder' | 'mobileNumber' | 'pin'
+type DemoFields = Record<DemoFieldKey, string>
+type DemoFieldErrors = Partial<Record<DemoFieldKey, string>>
+
+const EMPTY_DEMO_FIELDS: DemoFields = {
+  cardNumber: '',
+  expiry: '',
+  cvc: '',
+  cardholder: '',
+  mobileNumber: '',
+  pin: '',
+}
+
+function isCardDemo(method: PaymentMethod): boolean {
+  return method.id === 'stripe' || method.id === 'stripe_demo'
+}
+
+function isMobileDemo(method: PaymentMethod): boolean {
+  return method.id === 'bkash' || method.id === 'bkash_demo' || method.id === 'nagad' || method.id === 'nagad_demo'
+}
+
+function demoFieldErrors(method: PaymentMethod, fields: DemoFields): DemoFieldErrors {
+  const errors: DemoFieldErrors = {}
+  if (isCardDemo(method)) {
+    if (fields.cardNumber.replace(/\D/g, '').length !== 16) errors.cardNumber = 'Enter a 16-digit demo card number.'
+    if (!/^\d{2}\/\d{2}$/.test(fields.expiry.trim())) errors.expiry = 'Use MM/YY.'
+    if (!/^\d{3}$/.test(fields.cvc.trim())) errors.cvc = 'Enter a 3-digit demo CVC.'
+    if (fields.cardholder.trim().length < 2) errors.cardholder = 'Enter the name on the demo card.'
+  }
+  if (isMobileDemo(method)) {
+    const mobile = fields.mobileNumber.replace(/\D/g, '')
+    if (mobile.length !== 11 || !mobile.startsWith('01')) errors.mobileNumber = 'Enter an 11-digit demo mobile number.'
+    if (!/^\d{4,6}$/.test(fields.pin.trim())) errors.pin = 'Enter a 4–6 digit demo PIN.'
+  }
+  return errors
+}
 
 export default function PaymentPanel({ appointment, onClose, onChanged }: PaymentPanelProps) {
   const [methods, setMethods] = useState<PaymentMethodsResponse | null>(null)
@@ -94,6 +135,8 @@ export default function PaymentPanel({ appointment, onClose, onChanged }: Paymen
   const [transaction, setTransaction] = useState<PaymentTransaction | null>(null)
   const [paymentStatus, setPaymentStatus] = useState(appointment.paymentStatus ?? 'unpaid')
   const [selectedMethodId, setSelectedMethodId] = useState<PaymentMethodId | null>(null)
+  const [demoFields, setDemoFields] = useState<DemoFields>(EMPTY_DEMO_FIELDS)
+  const [demoErrors, setDemoErrors] = useState<DemoFieldErrors>({})
   const [loading, setLoading] = useState(true)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -137,19 +180,32 @@ export default function PaymentPanel({ appointment, onClose, onChanged }: Paymen
   const methodOptions = useMemo(() => methods?.methods ?? [], [methods])
   const checkoutMethods = useMemo(
     () =>
-      CHECKOUT_METHODS.map((option) => ({
-        ...option,
-        method: methodOptions.find((method) => method.id === option.methodId) ?? null,
-        available: methodOptions.find((method) => method.id === option.methodId)?.available === true,
-      })),
+      CHECKOUT_METHODS.map((option) => {
+        const candidates = option.methodIds
+          .map((id) => methodOptions.find((method) => method.id === id))
+          .filter((method): method is PaymentMethod => Boolean(method))
+        const method = candidates.find((candidate) => candidate.available) ?? candidates[0] ?? null
+        return {
+          ...option,
+          method,
+          available: method?.available === true,
+        }
+      }),
     [methodOptions]
   )
   const selectedMethod = useMemo(
-    () => checkoutMethods.find((option) => option.methodId === selectedMethodId)?.method ?? null,
+    () =>
+      checkoutMethods
+        .map((option) => option.method)
+        .find((method) => method?.id === selectedMethodId) ?? null,
     [checkoutMethods, selectedMethodId]
   )
   const hasAvailableMethods = useMemo(
     () => checkoutMethods.some((option) => option.available),
+    [checkoutMethods]
+  )
+  const checkoutIsTest = useMemo(
+    () => checkoutMethods.some((option) => option.available && option.method?.simulated),
     [checkoutMethods]
   )
   const payable = appointment.status === 'confirmed' && paymentStatus !== 'paid'
@@ -159,6 +215,14 @@ export default function PaymentPanel({ appointment, onClose, onChanged }: Paymen
     if (method.id === 'nagad' && method.mode === 'real') {
       setError('Nagad checkout is not available yet.')
       return
+    }
+    if (method.simulated) {
+      const errors = demoFieldErrors(method, demoFields)
+      setDemoErrors(errors)
+      if (Object.keys(errors).length > 0) {
+        setError('Please complete the required demo payment fields.')
+        return
+      }
     }
     setBusy(true)
     setError(null)
@@ -179,7 +243,13 @@ export default function PaymentPanel({ appointment, onClose, onChanged }: Paymen
         setTransaction(result.transaction)
       } else {
         const result = await createPaymentSession(appointment.id, method.id)
-        setTransaction(result.transaction)
+        if (method.simulated) {
+          const settled = await simulatePaymentOutcome(result.transaction.id, 'success')
+          setTransaction(settled.transaction)
+          setPaymentStatus(settled.appointment?.paymentStatus ?? 'paid')
+        } else {
+          setTransaction(result.transaction)
+        }
       }
       onChanged()
     } catch (caught) {
@@ -187,6 +257,15 @@ export default function PaymentPanel({ appointment, onClose, onChanged }: Paymen
     } finally {
       setBusy(false)
     }
+  }
+
+  function updateDemoField(key: DemoFieldKey, value: string) {
+    setDemoFields((current) => ({ ...current, [key]: value }))
+    setDemoErrors((current) => {
+      const next = { ...current }
+      delete next[key]
+      return next
+    })
   }
 
   async function simulate(outcome: PaymentSimulationOutcome) {
@@ -287,15 +366,51 @@ export default function PaymentPanel({ appointment, onClose, onChanged }: Paymen
               </div>
             </div>
           ) : settledTransaction ? (
-            <div className="payment-result payment-result-success">
-              <Icon name="check" size={18} />
-              <div>
-                <strong>{STATUS_LABELS[settledTransaction.paymentStatus] ?? 'Paid'}</strong>
-                <span>
-                  {methodDisplayName(settledTransaction.paymentMethod, settledTransaction.simulated)} · BDT {settledTransaction.amount}
-                </span>
+            settledTransaction.simulated ? (
+              <div className="payment-success-screen">
+                <div className="payment-success-badge">
+                  <Icon name="check" size={22} />
+                  <span>Demo payment completed</span>
+                </div>
+                <h4>Payment Successful</h4>
+                <p>Demo payment completed successfully. No real money was charged.</p>
+                <dl className="payment-reference-list">
+                  <div>
+                    <dt>Transaction reference</dt>
+                    <dd>{settledTransaction.providerReference ?? settledTransaction.id}</dd>
+                  </div>
+                  <div>
+                    <dt>Booking reference</dt>
+                    <dd>{appointment.id}</dd>
+                  </div>
+                  <div>
+                    <dt>Payment method</dt>
+                    <dd>{methodDisplayName(settledTransaction.paymentMethod, settledTransaction.simulated)}</dd>
+                  </div>
+                  <div>
+                    <dt>Amount</dt>
+                    <dd>{settledTransaction.currency} {settledTransaction.amount}</dd>
+                  </div>
+                  <div>
+                    <dt>Status</dt>
+                    <dd>TEST / DEMO</dd>
+                  </div>
+                </dl>
+                <p className="payment-panel-note payment-panel-fineprint">
+                  This was a simulated transaction only; it is not a real Stripe, bKash, or Nagad payment.
+                </p>
               </div>
-            </div>
+            ) : (
+              <div className="payment-result payment-result-success">
+                <Icon name="check" size={18} />
+                <div>
+                  <strong>{STATUS_LABELS[settledTransaction.paymentStatus] ?? 'Paid'}</strong>
+                  <span>
+                    {methodDisplayName(settledTransaction.paymentMethod, settledTransaction.simulated)} · {settledTransaction.currency} {settledTransaction.amount}
+                  </span>
+                </div>
+              </div>
+            )
           ) : activeTransaction ? (
             <div className="payment-active">
               <div className="payment-result">
@@ -350,15 +465,20 @@ export default function PaymentPanel({ appointment, onClose, onChanged }: Paymen
               <div className="payment-method-list" role="group" aria-label="Payment methods">
                 {checkoutMethods.map((option) => {
                   const method = option.method
-                  const selected = option.methodId === selectedMethodId
+                  const selected = method?.id === selectedMethodId
                   const available = option.available && Boolean(method)
                   return (
                     <button
-                      key={option.methodId}
+                      key={option.key}
                       type="button"
                       className={`payment-method${selected ? ' is-selected' : ''}`}
                       disabled={busy || !available}
-                      onClick={() => method && setSelectedMethodId(method.id)}
+                      onClick={() => {
+                        if (method) {
+                          setSelectedMethodId(method.id)
+                          setDemoErrors({})
+                        }
+                      }}
                       aria-pressed={selected}
                     >
                       <span className="payment-method-main">
@@ -382,6 +502,94 @@ export default function PaymentPanel({ appointment, onClose, onChanged }: Paymen
                   )
                 })}
               </div>
+              {selectedMethod?.simulated && (
+                <div className="payment-demo-fields" aria-label="Demo payment details">
+                  <div className="payment-demo-note">
+                    <Icon name="shield" size={14} />
+                    <span>Demo fields only — do not enter real card, PIN, OTP, or banking credentials.</span>
+                  </div>
+                  {isCardDemo(selectedMethod) ? (
+                    <>
+                      <label className={`form-group${demoErrors.cardNumber ? ' form-group-error' : ''}`}>
+                        <span className="form-label">Demo card number</span>
+                        <input
+                          className="form-input"
+                          value={demoFields.cardNumber}
+                          onChange={(event) => updateDemoField('cardNumber', event.target.value)}
+                          placeholder="0000 0000 0000 0000"
+                          inputMode="numeric"
+                          autoComplete="off"
+                        />
+                        {demoErrors.cardNumber && <small className="form-error">{demoErrors.cardNumber}</small>}
+                      </label>
+                      <div className="payment-demo-grid">
+                        <label className={`form-group${demoErrors.expiry ? ' form-group-error' : ''}`}>
+                          <span className="form-label">Expiry</span>
+                          <input
+                            className="form-input"
+                            value={demoFields.expiry}
+                            onChange={(event) => updateDemoField('expiry', event.target.value)}
+                            placeholder="MM/YY"
+                            inputMode="numeric"
+                            autoComplete="off"
+                          />
+                          {demoErrors.expiry && <small className="form-error">{demoErrors.expiry}</small>}
+                        </label>
+                        <label className={`form-group${demoErrors.cvc ? ' form-group-error' : ''}`}>
+                          <span className="form-label">CVC</span>
+                          <input
+                            className="form-input"
+                            value={demoFields.cvc}
+                            onChange={(event) => updateDemoField('cvc', event.target.value)}
+                            placeholder="123"
+                            inputMode="numeric"
+                            autoComplete="off"
+                          />
+                          {demoErrors.cvc && <small className="form-error">{demoErrors.cvc}</small>}
+                        </label>
+                      </div>
+                      <label className={`form-group${demoErrors.cardholder ? ' form-group-error' : ''}`}>
+                        <span className="form-label">Name on card</span>
+                        <input
+                          className="form-input"
+                          value={demoFields.cardholder}
+                          onChange={(event) => updateDemoField('cardholder', event.target.value)}
+                          placeholder="Demo User"
+                          autoComplete="off"
+                        />
+                        {demoErrors.cardholder && <small className="form-error">{demoErrors.cardholder}</small>}
+                      </label>
+                    </>
+                  ) : isMobileDemo(selectedMethod) ? (
+                    <>
+                      <label className={`form-group${demoErrors.mobileNumber ? ' form-group-error' : ''}`}>
+                        <span className="form-label">Demo mobile number</span>
+                        <input
+                          className="form-input"
+                          value={demoFields.mobileNumber}
+                          onChange={(event) => updateDemoField('mobileNumber', event.target.value)}
+                          placeholder="01XXXXXXXXX"
+                          inputMode="tel"
+                          autoComplete="off"
+                        />
+                        {demoErrors.mobileNumber && <small className="form-error">{demoErrors.mobileNumber}</small>}
+                      </label>
+                      <label className={`form-group${demoErrors.pin ? ' form-group-error' : ''}`}>
+                        <span className="form-label">Demo PIN</span>
+                        <input
+                          className="form-input"
+                          value={demoFields.pin}
+                          onChange={(event) => updateDemoField('pin', event.target.value)}
+                          placeholder="Demo PIN"
+                          inputMode="numeric"
+                          autoComplete="off"
+                        />
+                        {demoErrors.pin && <small className="form-error">{demoErrors.pin}</small>}
+                      </label>
+                    </>
+                  ) : null}
+                </div>
+              )}
               <button
                 type="button"
                 className="payment-pay-button"
@@ -401,9 +609,9 @@ export default function PaymentPanel({ appointment, onClose, onChanged }: Paymen
                   Payment methods are currently unavailable. Please try again later or contact the salon.
                 </p>
               )}
-              {methods?.simulated && (
+              {checkoutIsTest && (
                 <p className="payment-panel-note payment-panel-fineprint">
-                  Test environment: payments are simulated and no real money is charged.
+                  TEST checkout: payments are simulated and no real money is charged.
                 </p>
               )}
             </>

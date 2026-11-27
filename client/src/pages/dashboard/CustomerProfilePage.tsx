@@ -19,7 +19,17 @@ import { getErrorMessage } from '@/utils/errors'
 
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
-export function CustomerProfileContent() {
+interface CustomerProfileContentProps {
+  title?: string
+  description?: string
+  eyebrow?: string
+}
+
+export function CustomerProfileContent({
+  title = 'My profile',
+  description = 'Keep your contact details up to date so the salon can reach you about appointments.',
+  eyebrow = 'Your account',
+}: CustomerProfileContentProps = {}) {
   const { user, updateUser } = useAuth()
   const { toast } = useToast()
 
@@ -146,9 +156,9 @@ export function CustomerProfileContent() {
   return (
     <>
       <DashboardPageHeader
-        eyebrow="Your account"
-        title="My profile"
-        description="Keep your contact details up to date so the salon can reach you about appointments."
+        eyebrow={eyebrow || undefined}
+        title={title}
+        description={description}
       />
 
       <div className="dashboard-grid dashboard-grid-profile">

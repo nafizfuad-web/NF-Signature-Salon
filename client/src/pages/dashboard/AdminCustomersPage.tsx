@@ -2,9 +2,10 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import EmptyState from '@/components/common/EmptyState'
 import ErrorState from '@/components/common/ErrorState'
 import Icon from '@/components/common/Icon'
+import AdminCard from '@/components/dashboard/AdminCard'
+import AdminPageHeader from '@/components/dashboard/AdminPageHeader'
 import DashboardAccessGate from '@/components/dashboard/DashboardAccessGate'
-import DashboardCard from '@/components/dashboard/DashboardCard'
-import DashboardPageHeader from '@/components/dashboard/DashboardPageHeader'
+import { AdminPaymentStatus } from '@/components/dashboard/AdminStatusPill'
 import TableSkeleton from '@/components/dashboard/TableSkeleton'
 import { useApiResource } from '@/hooks/useApiResource'
 import { useAuth } from '@/hooks/useAuth'
@@ -14,20 +15,10 @@ import {
   fetchAdminCustomers,
   setCustomerBlocked,
 } from '@/services/api/admin'
+import { resolveAssetUrl } from '@/services/config'
 import type { AdminCustomerDetail, CustomerRecord } from '@/types'
 import { formatDate, formatShortDate, getInitials } from '@/utils/format'
 import { getErrorMessage } from '@/utils/errors'
-
-const PAYMENT_LABELS: Record<string, string> = {
-  pending: 'Pending',
-  processing: 'Processing',
-  succeeded: 'Paid',
-  cash_pending: 'Cash pending',
-  cash_received: 'Cash received',
-  failed: 'Failed',
-  cancelled: 'Cancelled',
-  refunded: 'Refunded',
-}
 
 function AdminCustomersContent() {
   const { user } = useAuth()
@@ -102,17 +93,24 @@ function AdminCustomersContent() {
     }
   }
 
+  const openDetails = (customer: CustomerRecord) => {
+    setDetail(null)
+    setDetailLoading(true)
+    setSelectedId(customer.id)
+  }
+
   return (
     <>
-      <DashboardPageHeader
-        eyebrow="Salon operations"
+      <AdminPageHeader
         title="Customers"
-        description="Review customer accounts, booking history and payment records. Blocked customers cannot use protected features."
+        description="Review customer accounts, booking history and payment records."
       />
 
-      <div className="admin-search-row">
-        <div className="search-field">
-          <span className="search-field-icon" aria-hidden="true"><Icon name="search" size={18} /></span>
+      <div className="admin-toolbar">
+        <div className="admin-search">
+          <span className="admin-search-icon" aria-hidden="true">
+            <Icon name="search" size={17} />
+          </span>
           <input
             type="search"
             value={search}
@@ -121,101 +119,182 @@ function AdminCustomersContent() {
             aria-label="Search customers"
           />
           {search && (
-            <button type="button" className="search-field-clear" onClick={() => setSearch('')} aria-label="Clear customer search">
+            <button
+              type="button"
+              className="admin-search-clear"
+              onClick={() => setSearch('')}
+              aria-label="Clear customer search"
+            >
               <Icon name="x" size={15} />
             </button>
           )}
         </div>
-        <span className="results-meta">
+        <span className="admin-results-meta">
           Showing <strong>{customers.length}</strong> of {data?.length ?? 0} customers
         </span>
       </div>
 
-      <DashboardCard padded={false}>
+      <AdminCard padded={false}>
         {loading ? (
-          <div className="dashboard-card-pad"><TableSkeleton rows={6} columns={6} /></div>
+          <div className="admin-card-pad">
+            <TableSkeleton rows={6} columns={6} />
+          </div>
         ) : error ? (
-          <div className="dashboard-card-pad"><ErrorState title="We couldn't load customers" message={error} onRetry={refetch} /></div>
+          <div className="admin-card-pad">
+            <ErrorState title="We couldn't load customers" message={error} onRetry={refetch} />
+          </div>
         ) : customers.length === 0 ? (
-          <div className="dashboard-card-pad">
+          <div className="admin-card-pad">
             <EmptyState
               icon="users"
               title={search ? 'No customers match' : 'No customers yet'}
-              description={search ? 'Try a different name, email address or phone number.' : 'Customer accounts will appear here once people register.'}
-              action={search ? <button type="button" className="btn btn-outline btn-md" onClick={() => setSearch('')}>Clear search</button> : undefined}
+              description={
+                search
+                  ? 'Try a different name, email address or phone number.'
+                  : 'Customer accounts will appear here once people register.'
+              }
+              action={
+                search ? (
+                  <button type="button" className="btn btn-outline btn-md" onClick={() => setSearch('')}>
+                    Clear search
+                  </button>
+                ) : undefined
+              }
             />
           </div>
         ) : (
-          <div className="table-wrap">
-            <table className="data-table">
+          <div className="admin-table-wrap">
+            <table className="admin-table admin-customers-table">
               <caption className="sr-only">Registered salon customers</caption>
               <thead>
-                <tr><th>Customer</th><th>Phone</th><th>Visits</th><th>Last visit</th><th>Status</th><th><span className="sr-only">Actions</span></th></tr>
+                <tr>
+                  <th scope="col">Customer</th>
+                  <th scope="col">Phone</th>
+                  <th scope="col">Visits</th>
+                  <th scope="col">Last Visit</th>
+                  <th scope="col">Status</th>
+                  <th scope="col"><span className="sr-only">Actions</span></th>
+                </tr>
               </thead>
               <tbody>
-                {customers.map((customer) => (
-                  <tr key={customer.id}>
-                    <td>
-                      <div className="customer-cell">
-                        <span className="customer-avatar" aria-hidden="true">{getInitials(customer.name)}</span>
-                        <div><strong>{customer.name}</strong><span>{customer.email}</span></div>
-                      </div>
-                    </td>
-                    <td>{customer.phone ?? '—'}</td>
-                    <td>{customer.visits}</td>
-                    <td>{customer.lastVisit ? formatDate(customer.lastVisit) : '—'}</td>
-                    <td><span className={`badge ${customer.isBlocked ? 'badge-outline' : 'badge-gold'}`}>{customer.isBlocked ? 'Blocked' : 'Active'}</span></td>
-                    <td>
-                      <div className="table-actions">
-                        <button type="button" className="table-action-link" onClick={() => { setDetail(null); setDetailLoading(true); setSelectedId(customer.id); }}>Details</button>
-                        <button type="button" className="table-action-link is-danger" disabled={busyId === customer.id} onClick={() => void toggleBlock(customer)}>
-                          {customer.isBlocked ? 'Unblock' : 'Block'}
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
+                {customers.map((customer) => {
+                  const avatarUrl = customer.avatarUrl ? resolveAssetUrl(customer.avatarUrl) : null
+                  return (
+                    <tr key={customer.id}>
+                      <td>
+                        <div className="admin-customer-cell">
+                          <span className="admin-customer-avatar" aria-hidden="true">
+                            {avatarUrl ? <img src={avatarUrl} alt="" /> : getInitials(customer.name)}
+                          </span>
+                          <div className="admin-customer-copy">
+                            <strong>{customer.name}</strong>
+                            <span>{customer.email}</span>
+                          </div>
+                        </div>
+                      </td>
+                      <td>{customer.phone ?? '—'}</td>
+                      <td>{customer.visits}</td>
+                      <td>{customer.lastVisit ? formatDate(customer.lastVisit) : '—'}</td>
+                      <td>
+                        <span className={`admin-badge ${customer.isBlocked ? 'is-muted' : 'is-gold'}`}>
+                          {customer.isBlocked ? 'Blocked' : 'Active'}
+                        </span>
+                      </td>
+                      <td>
+                        <div className="admin-row-actions">
+                          <button
+                            type="button"
+                            className="admin-icon-button"
+                            onClick={() => openDetails(customer)}
+                            aria-label={`View details for ${customer.name}`}
+                            title="View customer"
+                          >
+                            <Icon name="eye" size={17} />
+                          </button>
+                          <button
+                            type="button"
+                            className={`admin-icon-button ${customer.isBlocked ? '' : 'is-danger'}`}
+                            disabled={busyId === customer.id}
+                            onClick={() => void toggleBlock(customer)}
+                            aria-label={customer.isBlocked ? `Unblock ${customer.name}` : `Block ${customer.name}`}
+                            title={customer.isBlocked ? 'Unblock customer' : 'Block customer'}
+                          >
+                            <Icon name={customer.isBlocked ? 'check' : 'ban'} size={16} />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  )
+                })}
               </tbody>
             </table>
           </div>
         )}
-      </DashboardCard>
+      </AdminCard>
 
       {selectedId && (
-        <DashboardCard
+        <AdminCard
           title={detailLoading ? 'Customer details' : detail?.customer.name ?? 'Customer details'}
           description={detail?.customer.email}
-          action={<button type="button" className="table-action-link" onClick={() => { setSelectedId(null); setDetail(null); setDetailLoading(false); }}>Close</button>}
+          action={
+            <button
+              type="button"
+              className="admin-text-button"
+              onClick={() => {
+                setSelectedId(null)
+                setDetail(null)
+                setDetailLoading(false)
+              }}
+            >
+              Close
+            </button>
+          }
         >
           {detailLoading ? (
             <TableSkeleton rows={4} columns={4} />
           ) : detail ? (
-            <div className="dashboard-grid dashboard-grid-2">
+            <div className="admin-detail-grid">
               <div>
-                <h3>Appointments</h3>
-                {detail.appointments.length === 0 ? <p className="table-muted">No appointments yet.</p> : (
-                  <ul className="plain-list">
+                <h3 className="admin-detail-title">Appointments</h3>
+                {detail.appointments.length === 0 ? (
+                  <p className="admin-muted-copy">No appointments yet.</p>
+                ) : (
+                  <ul className="admin-detail-list">
                     {detail.appointments.slice(0, 6).map((appointment) => (
-                      <li key={appointment.id}>{formatShortDate(appointment.date)} · {appointment.time} · {appointment.serviceTitle} · {appointment.status}</li>
+                      <li key={appointment.id}>
+                        <span>{formatShortDate(appointment.date)} · {appointment.time}</span>
+                        <strong>{appointment.serviceTitle}</strong>
+                        <small>{appointment.status}</small>
+                      </li>
                     ))}
                   </ul>
                 )}
               </div>
               <div>
-                <h3>Payments</h3>
-                {detail.transactions.length === 0 ? <p className="table-muted">No payment records yet.</p> : (
-                  <ul className="plain-list">
+                <h3 className="admin-detail-title">Payments</h3>
+                {detail.transactions.length === 0 ? (
+                  <p className="admin-muted-copy">No payment records yet.</p>
+                ) : (
+                  <ul className="admin-detail-list">
                     {detail.transactions.slice(0, 6).map((transaction) => (
-                      <li key={transaction.id}>{transaction.serviceTitle} · BDT {transaction.amount} · {PAYMENT_LABELS[transaction.paymentStatus] ?? transaction.paymentStatus}</li>
+                      <li key={transaction.id}>
+                        <span>{transaction.serviceTitle}</span>
+                        <strong>BDT {transaction.amount}</strong>
+                        <AdminPaymentStatus status={transaction.paymentStatus} />
+                      </li>
                     ))}
                   </ul>
                 )}
               </div>
             </div>
           ) : (
-            <ErrorState title="Customer details unavailable" message="The selected customer could not be loaded." onRetry={() => setSelectedId(selectedId)} />
+            <ErrorState
+              title="Customer details unavailable"
+              message="The selected customer could not be loaded."
+              onRetry={() => setSelectedId(selectedId)}
+            />
           )}
-        </DashboardCard>
+        </AdminCard>
       )}
     </>
   )
